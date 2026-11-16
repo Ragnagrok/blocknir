@@ -59,6 +59,13 @@ describe('scheduling', () => {
 });
 
 describe('actors, touches and signals', () => {
+  it('directionTo points down to something below (y grows down)', () => {
+    const p = b.program([b.cmd('move', b.sensor('directionTo', 'key'))]);
+    const g = new RealtimeGame({ arena: arena(3, 4), player: { x: 1, y: 0 }, actors: [{ kind: 'key', x: 1, y: 3 }] }, p);
+    g.step();
+    expect(g.actor('player')!.y).toBe(1);
+  });
+
   const patrol = (): Program => {
     const c = blocks('c');
     return c.program([], [], [c.on({ type: 'tick' }, c.ifElse(c.sensor('canMoveForward'), [c.cmd('forward')], [c.cmd('turnAround')]))]);

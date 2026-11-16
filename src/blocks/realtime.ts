@@ -780,7 +780,7 @@ export class RealtimeGame {
         const dx = o.x - a.x;
         const dy = o.y - a.y;
         if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 'E' : 'W';
-        return dy > 0 ? 'N' : 'S';
+        return dy > 0 ? 'S' : 'N'; // y grows down
       }
       case 'distanceTo': {
         const o = this.nearest(a, String(args[0]));
