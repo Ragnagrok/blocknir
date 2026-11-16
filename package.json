@@ -1,0 +1,38 @@
+{
+  "name": "ragnagrok-engine",
+  "version": "0.1.0",
+  "description": "Voxel engine for the web: chunked voxel meshing with ambient occlusion, rigged voxel figures, fixed cameras, collision and pathfinding, a synthesized audio engine and a browser editor.",
+  "license": "MIT",
+  "type": "module",
+  "repository": { "type": "git", "url": "git+https://github.com/Ragnagrok/ragnagrok-engine.git" },
+  "keywords": ["voxel", "game-engine", "three.js", "webgl", "editor", "web-audio"],
+  "exports": {
+    "./core": { "types": "./dist/core/index.d.ts", "import": "./dist/core/index.js" },
+    "./render": { "types": "./dist/render/index.d.ts", "import": "./dist/render/index.js" },
+    "./audio": { "types": "./dist/audio/index.d.ts", "import": "./dist/audio/index.js" },
+    "./kit": { "types": "./dist/kit/index.d.ts", "import": "./dist/kit/index.js" },
+    "./paint": { "types": "./dist/paint/index.d.ts", "import": "./dist/paint/index.js" }
+  },
+  "files": ["dist", "src", "LICENSE", "README.md", "README.es.md"],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.build.json",
+    "build:site": "vite build",
+    "prepare": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "three": ">=0.170.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.1",
+    "@types/node": "^22.20.5",
+    "@types/three": "^0.170.0",
+    "three": "^0.170.0",
+    "tsx": "4.19",
+    "typescript": "5.7",
+    "vite": "6.0",
+    "vitest": "2.1"
+  }
+}

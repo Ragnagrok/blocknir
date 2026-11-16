@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Adventure · Ragnagrok Engine</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #050506; overflow: hidden; color: #e6e1d6; font: 15px system-ui, sans-serif; }
+      #frame { position: absolute; inset: 0; margin: auto; aspect-ratio: 16 / 9; max-width: 100vw; max-height: 100vh; width: 100vw; }
+      canvas { display: block; width: 100%; height: 100%; }
+      #inventory { position: absolute; left: 3%; bottom: 5%; display: flex; gap: 4px; }
+      .slot { height: 34px; padding: 0 10px; display: grid; place-items: center; border: 1px solid #8a7f68; background: rgba(12, 11, 9, .72); font-size: 12px; }
+      #message, #prompt { position: absolute; left: 50%; transform: translateX(-50%); width: min(60%, 720px); text-align: center; line-height: 1.45; text-shadow: 0 2px 4px #000; }
+      #message { bottom: 9%; font-size: clamp(14px, 1.5vw, 20px); }
+      #prompt { bottom: 4%; font-size: 13px; color: #c9c1ad; }
+      #help { position: absolute; left: 3%; top: 5%; font-size: 13px; line-height: 1.6; color: #b6ad98; text-shadow: 0 1px 3px #000; }
+      #error { position: absolute; inset: 0; display: none; place-content: center; padding: 32px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <div id="frame">
+      <canvas id="canvas"></canvas>
+      <div id="inventory"></div>
+      <div id="message" role="status" aria-live="polite"></div>
+      <div id="prompt"></div>
+      <div id="help">W S / ↑ ↓ walk · A D / ← → turn · Shift run<br />E use · R restart</div>
+      <div id="error"></div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
