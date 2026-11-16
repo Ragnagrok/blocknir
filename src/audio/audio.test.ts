@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEMO_TRACK } from './demo-track.js';
-import { GameAudio, INSTRUMENTS, type Track } from './index.js';
+import { GameAudio, INSTRUMENTS, Sfx, type Track } from './index.js';
 import { chord, chords, chordTone, frequency, hits, note, steps } from './theory.js';
 
 describe('theory', () => {
@@ -73,6 +73,15 @@ describe('GameAudio', () => {
     let played = false;
     audio.play(() => (played = true));
     expect(played).toBe(false);
+  });
+
+  it('reports no state before starting and lets schedulers be added and removed', () => {
+    const audio = new GameAudio({ sfx: (e) => new Sfx(e) });
+    expect(audio.state).toBe('none');
+    expect(audio.sfx).toBeNull();
+    const remove = audio.addScheduler(() => {});
+    expect(remove()).toBe(true);
+    expect(remove()).toBe(false);
   });
 
   it('cycles the mute level', () => {

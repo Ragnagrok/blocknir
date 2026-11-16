@@ -54,6 +54,24 @@ describe('stickVector', () => {
 });
 
 describe('Dialogue', () => {
+  it('keeps a game line type and lets present() decide label and style', () => {
+    interface MyLine { text: string; who: 'narrator' | 'npc'; name?: string }
+    const el = dialogueBox();
+    const d = new Dialogue<MyLine>(el, {
+      present: (l) => (l.who === 'narrator' ? { speaker: 'Narrator', style: 'narration' } : { speaker: l.name ?? '' }),
+    });
+    const seen: MyLine['who'][] = [];
+    d.onLine = (l) => seen.push(l.who);
+    d.say([{ text: 'Once.', who: 'narrator' }, { text: 'Hi.', who: 'npc', name: 'Bo' }]);
+    expect(el.speaker.textContent).toBe('Narrator');
+    expect(el.box.classList.contains('narration')).toBe(true);
+    d.advance();
+    d.advance();
+    expect(el.speaker.textContent).toBe('Bo');
+    expect(el.box.classList.contains('narration')).toBe(false);
+    expect(seen).toEqual(['narrator', 'npc']);
+  });
+
   it('types lines out, advances, applies speaker and style, and calls back at the end', () => {
     const el = dialogueBox();
     const d = new Dialogue(el, { charsPerSecond: 10 });

@@ -36,17 +36,22 @@ export type Surface = 'tile' | 'pavement' | 'dirt' | 'stone';
 export type DialogueVoice = 'system' | 'narrator' | 'player' | (string & {});
 
 export class Sfx {
-  constructor(private e: AudioEngine) {}
+  constructor(protected readonly engine: AudioEngine) {}
 
-  private get ctx(): BaseAudioContext {
-    return this.e.ctx;
+  /** The audio context, for effects that build their own node graphs. */
+  protected get ctx(): BaseAudioContext {
+    return this.engine.ctx;
   }
 
-  private output(vol: number, reverb = 0, echo = 0, pan = 0): GainNode {
+  /**
+   * A gain node routed to the effects bus, with optional reverb and echo sends and stereo pan.
+   * Connect a custom sound to it to get the same placement as the built-in effects.
+   */
+  protected output(vol: number, reverb = 0, echo = 0, pan = 0): GainNode {
     const ctx = this.ctx;
     const g = ctx.createGain();
     g.gain.value = vol;
-    let destination: AudioNode = this.e.sfx.dry;
+    let destination: AudioNode = this.engine.sfx.dry;
     if (pan) {
       const p = ctx.createStereoPanner();
       p.pan.value = Math.max(-1, Math.min(1, pan));
@@ -54,12 +59,13 @@ export class Sfx {
       destination = p;
     }
     g.connect(destination);
-    if (reverb) g.connect(this.send(reverb, this.e.sfx.reverb));
-    if (echo) g.connect(this.send(echo, this.e.sfx.echo));
+    if (reverb) g.connect(this.send(reverb, this.engine.sfx.reverb));
+    if (echo) g.connect(this.send(echo, this.engine.sfx.echo));
     return g;
   }
 
-  private send(value: number, to: AudioNode): GainNode {
+  /** A gain node that feeds `to` (a reverb or echo input) at `value`. */
+  protected send(value: number, to: AudioNode): GainNode {
     const s = this.ctx.createGain();
     s.gain.value = value;
     s.connect(to);
@@ -107,7 +113,7 @@ export class Sfx {
     if (o.to) b.frequency.exponentialRampToValueAtTime(o.to, t + dur);
     b.Q.value = q;
     const r = ctx.createBufferSource();
-    r.buffer = this.e.noise;
+    r.buffer = this.engine.noise;
     r.loop = true;
     r.connect(b).connect(amp).connect(g);
     r.start(t, Math.random() * 1.5);
@@ -117,7 +123,7 @@ export class Sfx {
   // ── World ───────────────────────────────────────────────────────────────────────────────────
 
   /** One footstep, slightly varied each time. */
-  step(s: Surface, t = this.e.now): void {
+  step(s: Surface, t = this.engine.now): void {
     const v = 0.85 + Math.random() * 0.3;
     switch (s) {
       case 'tile':
@@ -141,7 +147,7 @@ export class Sfx {
   }
 
   /** A door: a creaking hinge and the thud of it closing. */
-  door(t = this.e.now): void {
+  door(t = this.engine.now): void {
     const ctx = this.ctx;
     // The creak: a saw that rises and falls through a narrow filter.
     const g = this.output(1, 0.4);
@@ -168,7 +174,7 @@ export class Sfx {
 
   /** A low boom that keeps ringing, for title cards and big reveals. */
   impact(): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     this.tone(70, t, 2.6, 0.5, { to: 32, reverb: 0.7 });
     this.noise(t, 1.6, 0.18, 'lowpass', 900, 0.7, { to: 120, reverb: 0.8 });
     for (const [i, n] of [74, 81, 86].entries()) this.tone(frequency(n), t + 0.15 + i * 0.12, 2.4, 0.025, { reverb: 0.9, echo: 0.4, attack: 0.3 });
@@ -176,7 +182,7 @@ export class Sfx {
 
   /** An explosion: a falling thump, a rumble and a crack. */
   explosion(): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     this.tone(120, t, 0.9, 0.5, { to: 28 });
     this.noise(t, 0.8, 0.35, 'lowpass', 2400, 0.8, { to: 150, reverb: 0.4 });
     this.noise(t, 0.15, 0.2, 'highpass', 3000, 1);
@@ -184,7 +190,7 @@ export class Sfx {
 
   /** Taking damage: a buzz that breaks up. */
   glitch(): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     for (let i = 0; i < 6; i++) this.noise(t + i * 0.045, 0.04, 0.16, 'bandpass', 600 + Math.random() * 3000, 3);
     this.tone(80, t, 0.6, 0.3, { type: 'sawtooth', to: 40, cutoff: 600 });
     this.tone(frequency(61), t + 0.05, 0.5, 0.05, { type: 'square', to: frequency(49), cutoff: 1800 });
@@ -194,7 +200,7 @@ export class Sfx {
 
   /** A typewriter blip for one letter of dialogue. Call it every other character or so. */
   letter(voice: DialogueVoice, char: string): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     // The same letter always sounds the same: that gives each voice an "intonation".
     const shift = 2 ** ((((char.toLowerCase().charCodeAt(0) * 7) % 5) - 2) / 12);
     switch (voice) {
@@ -218,7 +224,7 @@ export class Sfx {
 
   /** Opens a new line of dialogue: two beeps for the system, a soft whoosh for anyone else. */
   line(voice: DialogueVoice): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     if (voice === 'system') {
       this.tone(1600, t, 0.04, 0.1, { type: 'square', cutoff: 4000 });
       this.tone(2400, t + 0.05, 0.05, 0.0875, { type: 'square', cutoff: 4000 });
@@ -228,43 +234,43 @@ export class Sfx {
   // ── Interface ───────────────────────────────────────────────────────────────────────────────
 
   click(): void {
-    this.tone(1900, this.e.now, 0.025, 0.175, { type: 'square', cutoff: 5000 });
+    this.tone(1900, this.engine.now, 0.025, 0.175, { type: 'square', cutoff: 5000 });
   }
 
   /** A soft two-note chime: something new to look at. */
   notice(): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     this.tone(frequency(81), t, 0.5, 0.08, { reverb: 0.4 });
     this.tone(frequency(76), t + 0.12, 0.7, 0.08, { reverb: 0.4 });
   }
 
   /** Changing places: a passing whoosh. */
   transition(): void {
-    this.noise(this.e.now, 0.9, 0.14, 'bandpass', 300, 1.5, { to: 2400, attack: 0.4, reverb: 0.3 });
+    this.noise(this.engine.now, 0.9, 0.14, 'bandpass', 300, 1.5, { to: 2400, attack: 0.4, reverb: 0.3 });
   }
 
   /** Quick rising arpeggio: an action went through. */
   confirm(): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     [69, 72, 76, 81].forEach((n, i) => this.tone(frequency(n), t + i * 0.05, 0.1, 0.0765, { type: 'square', cutoff: 3500 }));
   }
 
   /** Two falling notes: not yet, or not like that. */
   error(): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     this.tone(frequency(64), t, 0.18, 0.06, { type: 'square', cutoff: 2000 });
     this.tone(frequency(60), t + 0.2, 0.3, 0.06, { type: 'square', cutoff: 2000 });
   }
 
   /** A dull thud: the thing is off, locked or out of reach. */
   denied(): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     this.tone(90, t, 0.3, 0.28, { to: 60 });
     this.tone(55, t, 0.6, 0.07, { type: 'sawtooth', cutoff: 300 });
   }
 
   /** Step `i` of a process: climbs a minor pentatonic scale over two octaves, then starts again. */
-  progress(i: number, t = this.e.now): void {
+  progress(i: number, t = this.engine.now): void {
     const scale = [0, 3, 5, 7, 10];
     const n = 69 + scale[i % 5]! + 12 * (Math.floor(i / 5) % 2);
     this.tone(frequency(n), t, 0.12, 0.063, { type: 'square', cutoff: 2600, echo: 0.15 });
@@ -272,21 +278,21 @@ export class Sfx {
 
   /** A rising sweep and three beeps: a device turns on or connects. */
   powerUp(): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     this.tone(220, t, 0.3, 0.102, { type: 'sawtooth', to: 1400, cutoff: 3000 });
     [76, 83, 88].forEach((n, i) => this.tone(frequency(n), t + 0.28 + i * 0.07, 0.12, 0.085, { type: 'square', cutoff: 4000, echo: 0.2 }));
   }
 
   /** A falling sweep and a low beep: a device turns off or disconnects. */
   powerDown(): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     this.tone(1200, t, 0.3, 0.09, { type: 'sawtooth', to: 160, cutoff: 2500 });
     this.tone(frequency(64), t + 0.25, 0.15, 0.072, { type: 'square', cutoff: 2000 });
   }
 
   /** A rising arpeggio with a shimmer that lingers: something was solved or restored. */
   success(): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     [72, 76, 79, 83, 86, 91].forEach((n, i) => this.tone(frequency(n), t + i * 0.07, 1.2, 0.06, { reverb: 0.5, echo: 0.3 }));
     this.noise(t + 0.3, 1.8, 0.04, 'highpass', 6000, 0.7, { attack: 0.5, reverb: 0.8 });
     this.tone(frequency(48), t, 1.6, 0.12, { type: 'triangle', attack: 0.05 });
@@ -294,7 +300,7 @@ export class Sfx {
 
   /** Three radar pings that come closer: something was found nearby. */
   ping(): void {
-    const t = this.e.now;
+    const t = this.engine.now;
     for (let i = 0; i < 3; i++) this.tone(1250 + i * 180, t + i * (0.55 - i * 0.12), 0.35, 0.084, { reverb: 0.4, echo: 0.3 });
   }
 }

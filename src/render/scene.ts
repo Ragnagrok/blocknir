@@ -11,6 +11,10 @@ export interface LiveLight {
 
 export interface BuiltScene {
   group: THREE.Group;
+  /** The room's mesh, inside `group`. */
+  room: THREE.Object3D;
+  /** One holder per instance, in the same order as `scene.instances`, inside `group`. */
+  instances: THREE.Group[];
   lights: LiveLight[];
 }
 
@@ -56,11 +60,13 @@ export function placeInstance(p: Project, i: Instance): THREE.Group {
 /** Room, objects and lights. Entities are added by whoever needs them (the game or the editor). */
 export function buildScene(p: Project, s: Scene): BuiltScene {
   const group = new THREE.Group();
-  group.add(instantiate(modelOf(p, s.room)));
-  for (const i of s.instances) group.add(placeInstance(p, i));
+  const room = instantiate(modelOf(p, s.room));
+  group.add(room);
+  const instances = s.instances.map((i) => placeInstance(p, i));
+  for (const h of instances) group.add(h);
   group.add(new THREE.AmbientLight(s.ambient.color, s.ambient.intensity));
   const lights = s.lights.map((l) => createLight(l, group));
-  return { group, lights };
+  return { group, room, instances, lights };
 }
 
 /**

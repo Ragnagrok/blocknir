@@ -17,15 +17,25 @@ export interface DialogueElements {
   text: HTMLElement;
 }
 
-export interface DialogueOptions {
+export interface DialogueOptions<L extends Line = Line> {
   charsPerSecond?: number;
+  /**
+   * Derives the label and style of a line when it starts. Lets a game keep its own line type (for
+   * example a speaker kind) and decide here how each kind looks. Defaults to `line.speaker` and
+   * `line.style`.
+   */
+  present?: (line: L) => { speaker?: string; style?: string };
   openClass?: string;
   completeClass?: string;
 }
 
-export class Dialogue {
-  private queue: Line[] = [];
-  private current: Line | null = null;
+/**
+ * Generic over the line type: `new Dialogue<MyLine>(...)` accepts lines with extra fields and hands
+ * them back, typed, to `present`, `onLine` and `onChar`.
+ */
+export class Dialogue<L extends Line = Line> {
+  private queue: L[] = [];
+  private current: L | null = null;
   private typed = 0;
   private done: (() => void) | null = null;
   private style = '';
@@ -33,14 +43,16 @@ export class Dialogue {
   private readonly completeClass: string;
   charsPerSecond: number;
   /** For sound: when a line starts. */
-  onLine: (line: Line) => void = () => {};
+  onLine: (line: L) => void = () => {};
   /** For sound: every other letter that appears, at most once per frame. */
-  onChar: (line: Line, char: string) => void = () => {};
+  onChar: (line: L, char: string) => void = () => {};
+  private readonly present: (line: L) => { speaker?: string; style?: string };
 
   constructor(
     private elements: DialogueElements,
-    options: DialogueOptions = {},
+    options: DialogueOptions<L> = {},
   ) {
+    this.present = options.present ?? ((l) => l);
     this.charsPerSecond = options.charsPerSecond ?? 55;
     this.openClass = options.openClass ?? 'open';
     this.completeClass = options.completeClass ?? 'complete';
@@ -52,12 +64,12 @@ export class Dialogue {
   }
 
   /** The line showing now, if any. */
-  get line(): Line | null {
+  get line(): L | null {
     return this.current;
   }
 
   /** Queues lines; `onDone` runs once the queue empties (it replaces an earlier pending one). */
-  say(lines: Line[], onDone?: () => void): void {
+  say(lines: L[], onDone?: () => void): void {
     this.queue.push(...lines);
     if (onDone) this.done = onDone;
     if (!this.current) this.next();
@@ -101,12 +113,13 @@ export class Dialogue {
       return;
     }
     box.classList.add(this.openClass);
-    if (this.current.style) {
-      this.style = this.current.style;
+    const look = this.present(this.current);
+    if (look.style) {
+      this.style = look.style;
       box.classList.add(this.style);
     }
     this.onLine(this.current);
-    this.elements.speaker.textContent = this.current.speaker ?? '';
+    this.elements.speaker.textContent = look.speaker ?? '';
     this.paint();
   }
 

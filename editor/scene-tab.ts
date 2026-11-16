@@ -110,7 +110,7 @@ export class SceneTab implements Tab {
     this.c.scene.fog = this.work ? null : new THREE.FogExp2(sc.fog.color, sc.fog.density);
 
     // Instances become selectable through their holder (they come right after the room).
-    const holders = built.group.children.slice(1, 1 + sc.instances.length);
+    const holders = built.instances;
     sc.instances.forEach((inst, i) => this.tag(holders[i]!, { kind: 'instance', id: inst.id }));
 
     const sphere = new THREE.SphereGeometry(0.1, 12, 10);

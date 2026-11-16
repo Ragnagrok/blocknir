@@ -6,7 +6,10 @@ import { gridOf, validate } from './project.js';
 import { createGrid, encodeGrid, setCell } from './voxel.js';
 
 /** A real project from the editor, before the translation. Private, so only present on its author's machine. */
-const LEGACY_FILE = process.env.LEGACY_PROJECT ?? fileURLToPath(new URL('../../../casa-voxel/proyecto/actual.json', import.meta.url));
+const LEGACY_FILE =
+  process.env.LEGACY_PROJECT ?? fileURLToPath(new URL('../../../casa-voxel/proyecto/copias/antes-de-ragnagrok-engine.json', import.meta.url));
+/** Only a file still in the old Spanish format is worth migrating. */
+const hasLegacyFile = existsSync(LEGACY_FILE) && readFileSync(LEGACY_FILE, 'utf8').includes('"escenaInicial"');
 
 function legacyFixture(): unknown {
   const room = createGrid(4, 2, 4);
@@ -102,7 +105,7 @@ describe('migrateLegacyProject', () => {
     expect(() => migrateLegacyProject(bad)).toThrow(/dragon/);
   });
 
-  it.skipIf(!existsSync(LEGACY_FILE))('migrates a real editor project', () => {
+  it.skipIf(!hasLegacyFile)('migrates a real editor project', () => {
     const json = JSON.parse(readFileSync(LEGACY_FILE, 'utf8')) as { modelos: unknown[]; figuras: unknown[]; escenas: unknown[] };
     const p = migrateLegacyProject(json);
     expect(validate(p)).toEqual([]);

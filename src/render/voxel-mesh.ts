@@ -36,9 +36,14 @@ export class VoxelMesh extends THREE.Group {
   /** Cells with y at or above this are hidden; call `rebuild` after changing it. */
   cutY: number | undefined;
 
-  constructor(readonly model: Model) {
+  /** `cutY` can be given up front, so the mesh isn't built twice. */
+  constructor(
+    readonly model: Model,
+    options: { cutY?: number } = {},
+  ) {
     super();
     this.grid = gridOf(model);
+    this.cutY = options.cutY;
     this.scale.setScalar(model.scale);
     this.rebuild();
   }

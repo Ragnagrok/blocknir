@@ -53,7 +53,9 @@ export type MuteLevel = 'all' | 'sfx' | 'none';
 
 const LEVELS: MuteLevel[] = ['all', 'sfx', 'none'];
 
-export interface GameAudioOptions {
+export interface GameAudioOptions<S extends Sfx = Sfx> {
+  /** Builds the effects object; pass your own `Sfx` subclass to add game-specific sounds. */
+  sfx?: (engine: AudioEngine) => S;
   /** localStorage key that remembers the mute level. Without one, it isn't remembered. */
   storageKey?: string;
   /** Music bus level when everything plays. Default 0.62. */
@@ -68,10 +70,11 @@ export interface GameAudioOptions {
  * Web Audio, like Node tests) everything is silent, but the requested track and ambience are kept
  * and begin when it starts.
  */
-export class GameAudio {
+export class GameAudio<S extends Sfx = Sfx> {
   private ctx: AudioContext | null = null;
   private e: AudioEngine | null = null;
-  private fx: Sfx | null = null;
+  private fx: S | null = null;
+  private schedulers = new Set<(until: number, engine: AudioEngine) => void>();
   private amb: Ambience | null = null;
   private track: Track | null = null;
   private playback: Playback | null = null;
@@ -80,7 +83,7 @@ export class GameAudio {
   private teardown: (() => void)[] = [];
   private current: MuteLevel = 'all';
 
-  constructor(private options: GameAudioOptions = {}) {
+  constructor(private options: GameAudioOptions<S> = {}) {
     const key = options.storageKey;
     if (!key) return;
     try {
@@ -94,6 +97,16 @@ export class GameAudio {
   /** The engine, once started: for custom effects or instruments. */
   get engine(): AudioEngine | null {
     return this.e;
+  }
+
+  /** The effects object, once started (your subclass when `options.sfx` was given). */
+  get sfx(): S | null {
+    return this.fx;
+  }
+
+  /** The audio context's state, or `'none'` before `start()` or without Web Audio. */
+  get state(): AudioContextState | 'none' {
+    return this.ctx?.state ?? 'none';
   }
 
   get level(): MuteLevel {
@@ -112,7 +125,7 @@ export class GameAudio {
     const e = new AudioEngine(ctx);
     this.ctx = ctx;
     this.e = e;
-    this.fx = new Sfx(e);
+    this.fx = this.options.sfx ? this.options.sfx(e) : (new Sfx(e) as S);
     this.amb = new Ambience(e, this.fx);
     this.applyLevel(0);
 
@@ -150,6 +163,17 @@ export class GameAudio {
     const until = e.now + 0.3;
     this.playback?.scheduleUntil(until);
     this.amb?.scheduleUntil(until);
+    for (const f of this.schedulers) f(until, e);
+  }
+
+  /**
+   * Adds work to the scheduling loop, for sound sources of your own (say, a second `Playback` on a
+   * filtered bus). `f` runs about every 50 ms while audio is running, with the time to schedule up
+   * to. Returns a function that removes it.
+   */
+  addScheduler(f: (until: number, engine: AudioEngine) => void): () => void {
+    this.schedulers.add(f);
+    return () => this.schedulers.delete(f);
   }
 
   /** Crossfades to another track, or to silence with null. Does nothing if that track is already playing. */
@@ -172,7 +196,7 @@ export class GameAudio {
   }
 
   /** Runs a sound effect, if audio is running and not fully muted: `audio.play((s) => s.click())`. */
-  play(f: (sfx: Sfx) => void): void {
+  play(f: (sfx: S) => void): void {
     if (this.fx && this.running && this.current !== 'none') f(this.fx);
   }
 
