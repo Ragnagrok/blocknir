@@ -98,6 +98,7 @@ audio.play((sfx) => sfx.step('stone'));
 | `ragnagrok-engine/audio` | `AudioEngine`, `INSTRUMENTS`, the `Playback` sequencer and music theory helpers, `Sfx`, `Ambience`, and the `GameAudio` facade. |
 | `ragnagrok-engine/kit` | `Joystick`, `Dialogue`, `Director`, `Actor`, `SaveSlot`. |
 | `ragnagrok-engine/paint` | `VoxelCanvas` and noise helpers for procedural models, and `createHumanoid`, a parametric voxel character (skin, hair, clothes, glasses, beard, silhouette) rigged with idle, walk, inspect and talk clips. |
+| `ragnagrok-engine/blocks` | A block-based programming language for kids and its interpreter, with the worlds programs run in: a grid with a robot (items, lamps, arrows, walls, level-defined actions), a drawing turtle, and a tick-based realtime arena with scripted actors. Levels, goals and execution traces are plain JSON; `check(level, program)` tests a program on every board and says why it fails, in Spanish by default. No DOM, no three.js. See [`src/blocks/README.md`](src/blocks/README.md). |
 
 Positions are in meters, model sizes in voxels, angles in radians. A heading of 0 faces +z.
 [`GLOSSARY.md`](GLOSSARY.md) maps the engine's names to the Spanish ones it had inside the games.

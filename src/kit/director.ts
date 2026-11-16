@@ -9,9 +9,9 @@ interface Wait {
   resolve: () => void;
 }
 
-export interface DirectorOptions {
-  /** Dialogue box used by `say`. */
-  dialogue?: Dialogue;
+export interface DirectorOptions<L extends Line = Line> {
+  /** Dialogue box used by `say`; any `Dialogue<L>`, so a game keeps its own line type. */
+  dialogue?: Dialogue<L>;
   /** Gets `cutsceneClass` while a cutscene runs. Defaults to `document.body` when there is a document. */
   root?: HTMLElement | null;
   cutsceneClass?: string;
@@ -26,18 +26,18 @@ export interface DirectorOptions {
   captionClass?: string;
 }
 
-export class Director {
+export class Director<L extends Line = Line> {
   /** How many cutscenes are running. While any is, the player should not control their character. */
   private running = 0;
   private waits: Wait[] = [];
-  private readonly options: DirectorOptions;
+  private readonly options: DirectorOptions<L>;
   private readonly root: HTMLElement | null;
   /** For tests: waits and fades finish at once. */
   hurry = false;
   /** For sound: when a caption appears. */
   onCaption: (text: string) => void = () => {};
 
-  constructor(options: DirectorOptions = {}) {
+  constructor(options: DirectorOptions<L> = {}) {
     this.options = options;
     this.root = options.root !== undefined ? options.root : (globalThis.document?.body ?? null);
   }
@@ -67,7 +67,7 @@ export class Director {
   }
 
   /** Shows lines in the dialogue box and resolves when the player has gone through all of them. */
-  say(lines: Line[]): Promise<void> {
+  say(lines: L[]): Promise<void> {
     const d = this.options.dialogue;
     if (!d) return Promise.reject(new Error('Director.say needs a dialogue (pass it in the options)'));
     return new Promise((resolve) => d.say(lines, resolve));

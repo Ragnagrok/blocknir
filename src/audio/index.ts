@@ -58,6 +58,11 @@ export interface GameAudioOptions<S extends Sfx = Sfx> {
   sfx?: (engine: AudioEngine) => S;
   /** localStorage key that remembers the mute level. Without one, it isn't remembered. */
   storageKey?: string;
+  /**
+   * How each level is written under `storageKey`, for games that already stored their own names
+   * (say `{ all: 'todo', sfx: 'efectos', none: 'nada' }`). Defaults to the level names themselves.
+   */
+  storedNames?: Partial<Record<MuteLevel, string>>;
   /** Music bus level when everything plays. Default 0.62. */
   musicVolume?: number;
   /** Ambience bus level unless muted. Default 0.9. */
@@ -87,8 +92,9 @@ export class GameAudio<S extends Sfx = Sfx> {
     const key = options.storageKey;
     if (!key) return;
     try {
-      const stored = localStorage.getItem(key) as MuteLevel | null;
-      if (stored && LEVELS.includes(stored)) this.current = stored;
+      const stored = localStorage.getItem(key);
+      const level = LEVELS.find((l) => this.storedName(l) === stored);
+      if (level) this.current = level;
     } catch {
       // No storage: stays at "all".
     }
@@ -200,12 +206,16 @@ export class GameAudio<S extends Sfx = Sfx> {
     if (this.fx && this.running && this.current !== 'none') f(this.fx);
   }
 
+  private storedName(level: MuteLevel): string {
+    return this.options.storedNames?.[level] ?? level;
+  }
+
   setLevel(level: MuteLevel): void {
     this.current = level;
     const key = this.options.storageKey;
     if (key) {
       try {
-        localStorage.setItem(key, level);
+        localStorage.setItem(key, this.storedName(level));
       } catch {
         // Applies anyway, just without remembering it.
       }

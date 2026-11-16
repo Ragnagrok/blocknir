@@ -84,6 +84,23 @@ describe('GameAudio', () => {
     expect(remove()).toBe(false);
   });
 
+  it('stores the level under the game\'s own names', () => {
+    const store = new Map<string, string>();
+    const fake = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+    const real = (globalThis as { localStorage?: unknown }).localStorage;
+    (globalThis as { localStorage?: unknown }).localStorage = fake;
+    try {
+      store.set('game.sound', 'efectos');
+      const names = { all: 'todo', sfx: 'efectos', none: 'nada' } as const;
+      const audio = new GameAudio({ storageKey: 'game.sound', storedNames: names });
+      expect(audio.level).toBe('sfx');
+      audio.cycleLevel();
+      expect(store.get('game.sound')).toBe('nada');
+    } finally {
+      (globalThis as { localStorage?: unknown }).localStorage = real;
+    }
+  });
+
   it('cycles the mute level', () => {
     const audio = new GameAudio();
     expect(audio.level).toBe('all');
