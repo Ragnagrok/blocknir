@@ -151,7 +151,7 @@ All text shown to children is data (`Labels`): block templates (`labels.blocks[k
 (`Mover {0}`, `Encender farol`, `Repetir {0} veces`, `Avanzar {0} pasos`, `Girar ↻ {0} grados`,
 `Levantar tiza`, `¿Botón {0} apretado?`, `Fijar {var} en {0}`…). `labelsFor(level)` merges
 everything with the level's `labels` overrides; a level sets, for example,
-`{ "blocks": { "procedure": "Enseñar a Bolo: {name}" }, "names": { "lamp": "farol" } }`.
+`{ "blocks": { "procedure": "Enseñar a Tito: {name}" }, "names": { "lamp": "farol" } }`.
 
 ## Running and the trace
 
@@ -348,7 +348,7 @@ state (actors with positions, looks, variables; shared variables; RNG state).
     "sensors": [{ "name": "itemHere", "args": ["flag"], "label": "¿Llegué al final?" }],
     "control": ["repeat", "repeatUntil"]
   },
-  "labels": { "blocks": { "procedure": "Enseñar a Bolo: {name}" } }
+  "labels": { "blocks": { "procedure": "Enseñar a Tito: {name}" } }
 }
 ```
 

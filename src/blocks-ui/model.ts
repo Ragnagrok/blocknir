@@ -723,7 +723,7 @@ export class EditorModel {
   // Procedures and handlers
   // -------------------------------------------------------------------------------------------
 
-  /** Defines a new procedure ("Enseñar a Bolo: name"). The cursor moves into its body. */
+  /** Defines a new procedure ("Enseñar a Tito: name"). The cursor moves into its body. */
   addProcedure(name: string, params: string[] = []): EditResult {
     const n = name.trim();
     if (!n) return no('name');

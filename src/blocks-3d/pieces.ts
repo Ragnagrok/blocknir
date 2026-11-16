@@ -339,7 +339,18 @@ const CLIP_FALLBACKS: Record<string, string[]> = {
 export function figureCharacter(
   project: Project,
   figure: Figure,
-  options: { scale?: number; height: number; actions?: Record<string, string>; extra?: (clip: string, t: number, f: Figure3D, info?: PoseInfo) => void },
+  options: {
+    scale?: number;
+    height: number;
+    actions?: Record<string, string>;
+    /**
+     * Lasting poses: while the robot holds one of these items, `idle` plays its clip (`{ lying:
+     * 'lieDown' }`), and `cheer` too (lying in the hammock, it stays lying when the level passes).
+     * When it holds several, the last one listed wins.
+     */
+    rest?: Record<string, string>;
+    extra?: (clip: string, t: number, f: Figure3D, info?: PoseInfo) => void;
+  },
 ): CharacterVisual & { figure: Figure3D } {
   const f = new Figure3D(project, figure, { light: false });
   f.scale.setScalar(options.scale ?? 1);
@@ -353,6 +364,11 @@ export function figureCharacter(
   });
   const names = new Set(figure.clips.map((c) => c.name));
   const pick = (clip: string, info?: PoseInfo): string => {
+    if ((clip === 'idle' || clip === 'cheer') && options.rest && info?.inventory) {
+      let rest: string | undefined;
+      for (const [item, c] of Object.entries(options.rest)) if ((info.inventory[item] ?? 0) > 0 && names.has(c)) rest = c;
+      if (rest) return rest;
+    }
     const action = clip === 'action' && info?.action ? [options.actions?.[info.action], info.action] : [];
     return [...action, ...(CLIP_FALLBACKS[clip] ?? [clip, 'idle'])].find((c): c is string => !!c && names.has(c)) ?? 'idle';
   };

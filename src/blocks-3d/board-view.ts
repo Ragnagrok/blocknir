@@ -588,7 +588,7 @@ export class BoardView {
     const cam = this.view.camera;
     cam.aspect = this.size.w / this.size.h;
     const bounds: Bounds = this.stage?.bounds() ?? { min: [-2, 0, -2], max: [2, 1, 2] };
-    const f = frameBox(bounds, { fov: cam.fov, aspect: cam.aspect, margin: 0.03 });
+    const f = frameBox(bounds, { fov: cam.fov, aspect: cam.aspect, margin: 0.03, minExtent: 1.5 });
     this.framing = f;
     // The sun: from the upper left, a bit in front, with a shadow box that just covers the board.
     const sx = bounds.max[0] - bounds.min[0];

@@ -33,6 +33,8 @@ interface Live {
   heading: number;
   fromHeading: number;
   moved: boolean;
+  /** It also moved in the tick before (walking on: linear pace, no easing). */
+  wasMoving: boolean;
   /** Seconds since it appeared (pop-in), and since it vanished (shrink), or -1. */
   born: number;
   gone: number;
@@ -151,6 +153,7 @@ export class RealtimeStage implements Stage {
       heading: headingOf(s.facing),
       fromHeading: headingOf(s.facing),
       moved: false,
+      wasMoving: false,
       born: pop ? 0 : 1e3,
       gone: -1,
       bump: null,
@@ -186,6 +189,7 @@ export class RealtimeStage implements Stage {
     for (const a of this.actors.values()) {
       a.from.copy(a.to);
       a.fromHeading = a.heading;
+      a.wasMoving = a.moved;
       a.moved = false;
     }
     this.state = structuredClone(state);
@@ -296,7 +300,8 @@ export class RealtimeStage implements Stage {
     for (const a of [...this.actors.values()]) {
       const m = a.mover;
       const fly = a.def.fly ?? 0;
-      const p = a.def.projectile ? k : easeInOut(k);
+      // Walking on from the last tick keeps its pace (no stop at every cell); starting eases in.
+      const p = a.def.projectile || a.wasMoving ? k : easeInOut(k);
       tmp.lerpVectors(a.from, a.to, p);
       m.x = tmp.x;
       m.z = tmp.z;
@@ -316,8 +321,9 @@ export class RealtimeStage implements Stage {
         if (b >= 1) a.bump = null;
       }
       if (!this.ended || !a.player) {
+        // Between two steps of a walk (the next tick a bit late) it keeps walking: no idle flicker.
         if (a.moved && k < 1) m.play('walk');
-        else if (m.clip === 'walk') m.play('idle');
+        else if (m.clip === 'walk' && (!a.moved || this.age > this.interval * 1.6)) m.play('idle');
       }
       let scale = 1;
       if (a.born < 1e3) {

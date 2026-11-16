@@ -342,6 +342,57 @@ describe('action clips', () => {
       ['idle', undefined],
     ]);
   });
+
+  it('a lasting pose holds between actions while the robot carries its item', () => {
+    const f = figure([clip('idle', 0), clip('lying', 4), clip('asleep', 5)]);
+    const v = figureCharacter(project(f), f, { height: 1, rest: { lying: 'lying', asleep: 'asleep' } });
+    v.pose('idle', 0, { inventory: { lying: 1 } });
+    expect(angle(v)).toBeCloseTo(4);
+    v.pose('idle', 0, { inventory: { lying: 1, asleep: 1 } });
+    expect(angle(v)).toBeCloseTo(5);
+    // Cheering when the level passes keeps the lasting pose (it won asleep in the hammock).
+    v.pose('cheer', 0, { inventory: { lying: 1, asleep: 1 } });
+    expect(angle(v)).toBeCloseTo(5);
+    v.pose('idle', 0, { inventory: { lying: 0 } });
+    expect(angle(v)).toBeCloseTo(0);
+    const seen: Array<Record<string, number> | undefined> = [];
+    const m = new Mover({ object: new THREE.Group(), height: 1, pose: (_c, _t, info) => seen.push(info?.inventory as Record<string, number> | undefined) });
+    m.rest = { inventory: { lying: 1 } };
+    m.once('action', 0.5, 'idle', { action: 'closeEyes' });
+    m.update(0.1);
+    m.update(0.5);
+    expect(seen).toEqual([{ lying: 1 }, { lying: 1 }]);
+  });
+
+  it('a new clip blends in from the pose on screen instead of snapping', () => {
+    const root = new THREE.Group();
+    const arm = new THREE.Object3D();
+    root.add(arm);
+    const m = new Mover({ object: root, height: 1, pose: (c) => {
+      arm.position.x = c === 'walk' ? 1 : 0;
+      arm.rotation.z = c === 'walk' ? 1 : 0;
+    } });
+    m.update(0.1);
+    expect(arm.position.x).toBe(0);
+    m.play('walk');
+    m.update(m.blend / 2);
+    expect(arm.position.x).toBeCloseTo(0.5, 5);
+    expect(arm.rotation.z).toBeCloseTo(0.5, 2);
+    m.update(m.blend);
+    expect(arm.position.x).toBe(1);
+    // A one-shot clip that ends blends back too.
+    m.once('idle', 0.2, 'walk');
+    m.update(0.01);
+    expect(arm.position.x).toBeGreaterThan(0.9);
+    m.update(0.5);
+    m.update(0.5);
+    expect(arm.position.x).toBe(1);
+    // After a cut (a reset), the next pose shows at once.
+    m.play('idle', true);
+    m.cut();
+    m.update(0.01);
+    expect(arm.position.x).toBe(0);
+  });
 });
 
 describe('skin tables', () => {

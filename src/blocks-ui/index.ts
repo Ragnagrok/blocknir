@@ -10,6 +10,7 @@
  * editor.highlight(step.node); editor.markError(err.nodeId, err.message);
  * ```
  */
+export { renderProgram, renderStatement, type StaticBlocksOptions } from './static.js';
 export { BlockEditor, type BlockEditorEvents, type BlockEditorOptions, type Theme } from './editor.js';
 export {
   deserializeProgram,

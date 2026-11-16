@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.3.1
+
+What the kids' book asked for on phones, in quizzes and in playback.
+
+- **blocks-ui**: on narrow screens the palette shows one group at a time: the category chips work
+  as tabs (and wrap), and the group's blocks wrap to the next line. No block is cut at the edge of
+  a sideways strip any more. A palette block follows the finger at once (`touch-action: none`);
+  the palette takes at most about a third of the editor (`--rbk-pal-max`).
+- **blocks-ui**: `renderProgram(level, program)` and `renderStatement(level, statement)` draw
+  programs as read-only pictures that look like the editor's blocks, without palette or bar, for
+  quizzes and printouts (`size: 'small'`, `hat: false`).
+- **blocks-3d**: lasting poses. `PoseInfo.inventory` carries what the grid robot holds on every
+  clip, and `figureCharacter(…, { rest: { lying: 'lieDown' } })` keeps a clip for `idle` while the
+  robot holds that item: a character lying in a hammock no longer stands up between two actions.
+  `Mover.rest` holds what lasts between clips.
+- **blocks-3d**: tiny boards (2 × 1, 4 × 1) are framed closer (`minExtent` 1.5 m instead of 3).
+- **blocks-ui**: a terrain slot (`terrainIs`) offers the terrains on the board when the toolbox gives
+  no `choices.names`.
+- **blocks-3d**: smoother playback, no odd frames.
+  - `Mover` blends each new clip in from the pose on screen (`blend`, 0.14 s; `cut()` skips it on
+    a reset), so going from walk to idle to light no longer snaps the limbs in one frame.
+  - A level action that moves the robot (`goTo`, jumps) no longer shows it at the target cell for
+    a few frames before the jump starts from the old one.
+  - The robot turns toward where it walks smoothly, with no snap at the end of the turn.
+  - `cheer` keeps a lasting pose too: a character that wins asleep in the hammock stays lying.
+  - Realtime games: a character walking on from tick to tick keeps its pace and its walk clip,
+    instead of stopping and flashing idle at every cell.
+
 ## 0.3.0
 
 Three new modules for a kids' programming book built on the engine, and the hooks it asked for.

@@ -232,8 +232,13 @@ export class Schema {
     if (ch.names?.length) return [...ch.names];
     const found = new Set<string>();
     if (level.world === 'grid') {
-      if (hint === 'color') for (const c of COLORS) found.add(c);
-      else for (const c of level.board.cells ?? []) for (const k of Object.keys({ ...c.items, ...c.hidden })) found.add(k);
+      if (hint === 'color') {
+        for (const c of COLORS) found.add(c);
+      } else if (hint === 'terrain') {
+        for (const c of level.board.cells ?? []) if (c.terrain) found.add(c.terrain);
+      } else {
+        for (const c of level.board.cells ?? []) for (const k of Object.keys({ ...c.items, ...c.hidden })) found.add(k);
+      }
     } else if (level.world === 'turtle') {
       for (const c of COLORS) found.add(c);
     } else {

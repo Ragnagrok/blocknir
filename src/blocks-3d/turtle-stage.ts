@@ -270,6 +270,7 @@ export class TurtleStage implements StepStage<TurtleEvent> {
     this.mover.tilt = 0;
     this.placeTurtle(this.at([state.x, state.y]));
     this.mover.play('idle', true);
+    this.mover.cut();
     this.mover.visual.setPen?.(state.pen, colorOf(this.ctx.assets.skin, state.color));
   }
 

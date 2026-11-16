@@ -124,7 +124,8 @@ export const CSS = `
 /* ---------- palette ---------- */
 .rbk-cats { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border-bottom: 1px solid var(--rbk-border); flex: none; }
 .rbk-cats[hidden] { display: none; }
-.rbk-narrow .rbk-cats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 6px 8px; }
+.rbk-narrow .rbk-cats { gap: 6px; padding: 6px 8px; }
+.rbk-narrow .rbk-cat { min-height: 36px; padding: 0 10px; font-size: 14px; }
 .rbk-cat { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border-radius: 999px; border: 2px solid var(--rbk-cat); background: transparent; color: var(--rbk-text); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; white-space: nowrap; flex: none; }
 .rbk-cat::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--rbk-cat); }
 .rbk-cat[aria-current="true"] { background: var(--rbk-cat); color: var(--rbk-on-block); }
@@ -136,12 +137,15 @@ export const CSS = `
 .rbk-pal-sec { min-width: 0; }
 .rbk-pitem { display: block; max-width: 100%; border-radius: 14px; cursor: grab; touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .rbk-pitem * { touch-action: auto; }
-/* Narrow: the palette is a strip that scrolls sideways; each group is up to three rows of blocks. */
-.rbk-narrow .rbk-pal { display: flex; align-items: flex-start; gap: 18px; overflow-x: auto; overflow-y: hidden; padding: 0 10px 10px; scroll-padding: 0 10px; }
-.rbk-narrow .rbk-pal-h { margin: 6px 2px 6px; position: sticky; left: 0; }
-.rbk-narrow .rbk-pal-items { display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rbk-strip-rows, 3), auto); justify-items: start; align-items: center; gap: 8px 10px; }
-.rbk-narrow .rbk-pitem { touch-action: pan-x pinch-zoom; max-width: 260px; }
-.rbk-narrow .rbk-pal-sec { flex: none; }
+/* Narrow: one group at a time (the chips are tabs); its blocks wrap and the palette scrolls down if it must. */
+.rbk-narrow .rbk-pal { flex: none; max-height: var(--rbk-pal-max, 220px); padding: 0 10px 10px; }
+.rbk-narrow .rbk-pal-sec[hidden] { display: none; }
+.rbk-narrow .rbk-pal-h { margin: 6px 2px 6px; }
+.rbk-narrow .rbk-cats:not([hidden]) + .rbk-pal .rbk-pal-h { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.rbk-narrow .rbk-cats:not([hidden]) + .rbk-pal { padding-top: 8px; }
+.rbk-narrow .rbk-pal-items { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+/* Narrow: a block in the palette moves the moment the finger does (no scrolling under it). */
+.rbk-narrow .rbk-pitem { touch-action: none; }
 .rbk-pitem.rbk-disabled { opacity: 0.45; cursor: not-allowed; }
 .rbk-pitem .rbk-stmt::after { display: none; }
 .rbk-newvar { min-height: 44px; }
@@ -276,6 +280,20 @@ export const CSS = `
 .rbk-toast.rbk-show { opacity: 1; transform: translate(-50%, 0); }
 .rbk-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .rbk-readonly .rbk-palette { opacity: 0.55; }
+/* ---------- static pictures of programs (renderProgram, renderStatement) ---------- */
+.rbk-editor.rbk-static { display: block; height: auto; min-height: 0; overflow: visible; background: transparent; }
+.rbk-static-small { --rbk-font-size: 14px; --rbk-hit: 38px; --rbk-radius: 10px; }
+.rbk-static .rbk-script { margin: 0 0 10px; padding: 0; background: transparent; }
+.rbk-static .rbk-script:last-child { margin-bottom: 0; }
+.rbk-static .rbk-gap { height: 3px; pointer-events: none; }
+.rbk-static .rbk-gap::before { display: none; }
+.rbk-static .rbk-gap.rbk-end { height: 0; }
+.rbk-static .rbk-gap.rbk-empty { min-height: 26px; padding: 0; font-size: 0; }
+.rbk-static-nohat .rbk-hat { display: none; }
+.rbk-static .rbk-field svg { display: none; }
+.rbk-static .rbk-field { border-style: solid; }
+.rbk-static .rbk-stmt, .rbk-static .rbk-hat { max-width: 100%; }
+.rbk-static .rbk-stmt, .rbk-static .rbk-hat, .rbk-static .rbk-rep { cursor: inherit; }
 .rbk-readonly .rbk-stmt, .rbk-readonly .rbk-rep, .rbk-readonly .rbk-pitem { cursor: default; }
 @media (prefers-reduced-motion: reduce) { .rbk-editor * { animation: none !important; transition: none !important; } }
 `;

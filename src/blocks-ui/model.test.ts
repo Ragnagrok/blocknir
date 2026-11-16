@@ -29,7 +29,7 @@ const lamps: GridLevel = {
     choices: { directions: ['N', 'E', 'S', 'W'] },
     par: 8,
   },
-  labels: { blocks: { procedure: 'Enseñar a Bolo: {name}', call: 'Bolo sabe: {name}' } },
+  labels: { blocks: { procedure: 'Enseñar a Tito: {name}', call: 'Tito sabe: {name}' } },
 };
 
 const main = { kind: 'main' } as const;
@@ -71,7 +71,7 @@ describe('schema: palette templates and new blocks', () => {
     const { schema, model, stmt: make, make: reporter } = setup();
     const ts = schema.templates(model.program, { variables: [] });
     expect(new Set(ts.map((t) => t.group))).toEqual(new Set(['actions', 'sensors', 'control', 'values', 'procedures']));
-    expect(ts.find((t) => t.key === 'procedure')).toMatchObject({ shape: 'hat', creates: 'procedure', label: 'Enseñar a Bolo: {name}' });
+    expect(ts.find((t) => t.key === 'procedure')).toMatchObject({ shape: 'hat', creates: 'procedure', label: 'Enseñar a Tito: {name}' });
     const move = make('command:move');
     expect(move).toMatchObject({ kind: 'command', command: 'move', args: [{ kind: 'direction', value: 'N' }] });
     const rep = make('control:repeat');
@@ -106,6 +106,10 @@ describe('schema: palette templates and new blocks', () => {
     expect(schema.fits('direction', 'name')).toBe(true);
     expect(schema.choices({ type: 'direction' })).toEqual(['N', 'E', 'S', 'W']);
     expect(schema.choices({ type: 'name', name: 'item' })).toEqual(['lamp']);
+    expect(schema.choices({ type: 'name', name: 'color' })).toContain('red');
+    // Terrain slots offer the board's terrains.
+    const water = new Schema({ ...lamps, board: { ...lamps.board, cells: [...(lamps.board.cells ?? []), { x: 0, y: 2, terrain: 'water', wall: true }] } });
+    expect(water.choices({ type: 'name', name: 'terrain' })).toEqual(['water']);
   });
 });
 

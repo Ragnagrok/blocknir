@@ -19,7 +19,7 @@ import {
 import { buildFloor, cellCenter, place, type Floor } from './assets.js';
 import { boardBounds, type Bounds } from './framing.js';
 import { layoutCell, type CellEntry } from './layout.js';
-import { badgeTexture, copyObject, Bubble, clamp01, disposeObject, easeInOut, easeOut, easeOutBack, headingOf, InstancedTemplate, ScreenSprite, span } from './pieces.js';
+import { angleDelta, badgeTexture, copyObject, Bubble, clamp01, disposeObject, easeInOut, easeOut, easeOutBack, headingOf, InstancedTemplate, ScreenSprite, span } from './pieces.js';
 import { labelSprite } from './default-skin.js';
 import { Mover, StepShow, type Beat, type StageContext, type StepStage } from './stage.js';
 import { colorOf } from './skin.js';
@@ -196,6 +196,8 @@ export class GridStage implements StepStage<GridEvent> {
     this.mover.heading = headingOf(this.state.robot.facing);
     this.mover.tilt = 0;
     this.mover.play('idle', true);
+    this.mover.cut();
+    this.mover.rest = { inventory: this.state.inventory };
     this.carriedFrozen = false;
     this.dirty = this.carriedDirty = true;
   }
@@ -231,14 +233,14 @@ export class GridStage implements StepStage<GridEvent> {
     this.show = null;
   }
 
-  private apply(e: GridEvent): void {
+  /** Applies an event to the shown state. `place: false` leaves the robot where the animation has it. */
+  private apply(e: GridEvent, place = true): void {
     applyGridEvent(this.state, e);
+    this.mover.rest = { inventory: this.state.inventory };
     this.dirty = true;
     if (e.type === 'lit' && e.on) this.litOrder.unshift(`${e.x},${e.y}`);
     if (e.type === 'picked' || e.type === 'dropped' || e.type === 'action') this.carriedDirty = true;
-    if (e.type === 'moved' || (e.type === 'action' && e.moved)) {
-      this.placeRobot();
-    }
+    if (place && (e.type === 'moved' || (e.type === 'action' && e.moved))) this.placeRobot();
   }
 
   private beat(e: GridEvent): Beat {
@@ -252,11 +254,16 @@ export class GridStage implements StepStage<GridEvent> {
         const far = Math.abs(e.to[0] - e.from[0]) + Math.abs(e.to[1] - e.from[1]) > 1;
         const jump = e.dir === null || far;
         const heading = e.dir ? headingOf(e.dir) : Math.atan2(to.x - from.x, to.z - from.z);
+        let h0 = 0;
         return {
           weight: jump ? t.jump : t.move,
-          start: () => m.play(jump ? 'jump' : 'walk', jump),
+          start: () => {
+            m.play(jump ? 'jump' : 'walk', jump);
+            h0 = m.heading;
+          },
           update: (k) => {
-            m.turnToward(heading, span(k, 0, 0.3) * 0.6 + (k >= 0.3 ? 1 : 0));
+            // Turns toward where it goes in the first third of the step, smoothly (no snap at the end).
+            m.heading = h0 + angleDelta(h0, heading) * easeInOut(span(k, 0, 0.3));
             const p = jump ? easeInOut(span(k, 0.1, 0.9)) : easeInOut(k);
             m.x = from.x + (to.x - from.x) * p;
             m.z = from.z + (to.z - from.z) * p;
@@ -402,7 +409,8 @@ export class GridStage implements StepStage<GridEvent> {
         const doApply = (): void => {
           if (applied) return;
           applied = true;
-          this.apply(e);
+          // The jump that follows still starts from the old cell: the robot lands in `finish`.
+          this.apply(e, false);
           const [x, y, z] = this.cell(e.x, e.y);
           const visible = e.changes.some((c) => c.where === 'cell') || e.painted;
           if (visible) this.ctx.poof.burst(x, y + 0.3, z, e.painted ? colorOf(this.ctx.assets.skin, e.painted.color) : 0xfff4c8);

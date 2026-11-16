@@ -21,7 +21,7 @@ describe('preset blocks', () => {
       control: ['if'],
       procedures: true,
     },
-    labels: { blocks: { procedure: 'Enseñar a Chela: {name}' } },
+    labels: { blocks: { procedure: 'Enseñar a Monita: {name}' } },
   };
 
   it('the palette lists them with their labels and fixed arguments', () => {
@@ -32,7 +32,7 @@ describe('preset blocks', () => {
       { key: 'paint', category: 'command', label: 'Pintar', params: [{ type: 'name', name: 'color' }], args: ['red'] },
       { key: 'itemHere', category: 'sensor', label: '¿Hay manzana?', params: [{ type: 'name', name: 'item' }], returns: 'boolean', args: ['apple'] },
     ]);
-    expect(p.find((e) => e.key === 'procedure')!.label).toBe('Enseñar a Chela: {name}');
+    expect(p.find((e) => e.key === 'procedure')!.label).toBe('Enseñar a Monita: {name}');
   });
 
   it('a program must use them as given', () => {
@@ -166,7 +166,7 @@ describe('the README example level', () => {
         "commands": [{ "name": "move", "args": ["E"], "label": "Mover →" }, "lightLamp"],
         "sensors": [{ "name": "itemHere", "args": ["flag"], "label": "¿Llegué al final?" }],
         "control": ["repeat", "repeatUntil"] },
-      "labels": { "blocks": { "procedure": "Enseñar a Bolo: {name}" } }
+      "labels": { "blocks": { "procedure": "Enseñar a Tito: {name}" } }
     }`) as Level;
     const program = b.program([b.until(b.sensor('itemHere', 'flag'), b.cmd('lightLamp'), b.cmd('move', 'E'))]);
     const r = check(level, program);

@@ -1,5 +1,5 @@
 /**
- * Block label templates (`Repetir {0} veces`, `Fijar {var} en {0}`, `Enseñar a Bolo: {name}`) split
+ * Block label templates (`Repetir {0} veces`, `Fijar {var} en {0}`, `Enseñar a Tito: {name}`) split
  * into the pieces a view lays out: text, slots and name fields. Pure.
  */
 

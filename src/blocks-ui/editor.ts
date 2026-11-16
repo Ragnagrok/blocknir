@@ -90,8 +90,8 @@ type Target =
 interface Press {
   pointerId: number;
   touch: boolean;
-  /** Touch: the axis that starts a drag right away (the other one scrolls). */
-  axis: 'x' | 'y';
+  /** Which move starts a drag on touch: sideways (`x`), vertical (`y`) or any (`any`, nothing scrolls under it). */
+  axis: 'x' | 'y' | 'any';
   x0: number;
   y0: number;
   x: number;
@@ -156,6 +156,8 @@ export class BlockEditor {
 
   private templates = new Map<string, BlockTemplate>();
   private press: Press | null = null;
+  /** Narrow layout: the palette group shown (the category chips work as tabs). */
+  private narrowGroup: string | null = null;
   private drag: Drag | null = null;
   /** Set when a drag ends: the click the browser may fire right after it is not a tap. */
   private suppressClick = false;
@@ -361,12 +363,13 @@ export class BlockEditor {
   private applyLayout(): void {
     const mode = this.options.layout ?? 'auto';
     const narrow = mode === 'narrow' || (mode === 'auto' && this.element.clientWidth > 0 && this.element.clientWidth < (this.options.narrowBelow ?? 700));
-    // A short editor keeps more room for the program: two rows of palette blocks instead of three.
-    const rows = this.element.clientHeight > 0 && this.element.clientHeight < 760 ? '2' : '3';
-    if (this.element.style.getPropertyValue('--rbk-strip-rows') !== rows) this.element.style.setProperty('--rbk-strip-rows', rows);
+    // Narrow: the palette takes at most about a third of the editor and scrolls inside if it needs to.
+    const hgt = this.element.clientHeight;
+    const max = hgt > 0 ? `${Math.round(Math.min(280, Math.max(132, hgt * 0.34)))}px` : '';
+    if (this.element.style.getPropertyValue('--rbk-pal-max') !== max) this.element.style.setProperty('--rbk-pal-max', max);
     if (narrow === this.element.classList.contains('rbk-narrow')) return;
     this.element.classList.toggle('rbk-narrow', narrow);
-    this.pal.setAttribute('aria-orientation', narrow ? 'horizontal' : 'vertical');
+    this.applyGroupTabs();
   }
 
   private render(flashId?: NodeId): void {
@@ -476,16 +479,35 @@ export class BlockEditor {
     this.pal.replaceChildren(...sections);
     this.cats.replaceChildren(...chips);
     this.cats.hidden = chips.length < 2;
-    this.updateCats();
+    this.applyGroupTabs();
+  }
+
+  /**
+   * Narrow layout with two groups or more: one group at a time, chosen with the category chips, and
+   * its blocks wrap to the next line. Nothing is cut at the edge of a sideways strip. Wide layout:
+   * every group, one under the other, and the chips scroll to them.
+   */
+  private applyGroupTabs(): void {
+    const secs = [...this.pal.querySelectorAll<HTMLElement>('.rbk-pal-sec')];
+    const tabs = this.element.classList.contains('rbk-narrow') && secs.length > 1;
+    if (!tabs) {
+      for (const sec of secs) sec.hidden = false;
+      this.updateCats();
+      return;
+    }
+    const groups = secs.map((sec) => sec.getAttribute('data-group'));
+    if (!this.narrowGroup || !groups.includes(this.narrowGroup)) this.narrowGroup = groups[0] ?? null;
+    for (const sec of secs) sec.hidden = sec.getAttribute('data-group') !== this.narrowGroup;
+    for (const c of this.cats.querySelectorAll<HTMLElement>('.rbk-cat')) c.setAttribute('aria-current', c.getAttribute('data-cat') === this.narrowGroup ? 'true' : 'false');
   }
 
   private updateCats(): void {
-    const narrow = this.element.classList.contains('rbk-narrow');
+    if (this.element.classList.contains('rbk-narrow')) return;
     const box = this.pal.getBoundingClientRect();
     let current: string | null = null;
     for (const sec of this.pal.querySelectorAll<HTMLElement>('.rbk-pal-sec')) {
       const r = sec.getBoundingClientRect();
-      const start = narrow ? r.left - box.left : r.top - box.top;
+      const start = r.top - box.top;
       if (current === null || start <= 24) current = sec.getAttribute('data-group');
     }
     for (const c of this.cats.querySelectorAll<HTMLElement>('.rbk-cat')) c.setAttribute('aria-current', c.getAttribute('data-cat') === current ? 'true' : 'false');
@@ -673,9 +695,9 @@ export class BlockEditor {
     const found = this.sourceAt(target);
     if (!found) return;
     const touch = e.pointerType !== 'mouse';
-    // Scrollable along y (`pan-y`): a sideways move starts the drag; along x (narrow palette): a vertical one.
+    // Touch: `pan-y` (wide palette, workspace) drags on a sideways move, `pan-x` on a vertical one, `none` (narrow palette) on any.
     const ta = getComputedStyle(found.el.closest('.rbk-pitem') ?? found.el).touchAction;
-    const axis: 'x' | 'y' = ta.includes('pan-x') && !ta.includes('pan-y') ? 'y' : 'x';
+    const axis: Press['axis'] = ta === 'none' ? 'any' : ta.includes('pan-x') && !ta.includes('pan-y') ? 'y' : 'x';
     this.press = { pointerId: e.pointerId, touch, axis, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, source: found.source, el: found.el, timer: null };
     if (touch) {
       this.press.timer = setTimeout(() => {
@@ -698,7 +720,7 @@ export class BlockEditor {
       if (!p.touch) {
         if (Math.hypot(dx, dy) > SLOP_MOUSE) this.startDrag(p);
       } else if (Math.hypot(dx, dy) > SLOP_TOUCH) {
-        if (p.axis === 'x' ? dx > dy : dy > dx) this.startDrag(p);
+        if (p.axis === 'any' || (p.axis === 'x' ? dx > dy : dy > dx)) this.startDrag(p);
         else this.cancelPress(); // the browser scrolls
       }
       return;
@@ -1005,10 +1027,15 @@ export class BlockEditor {
   private showGroup(group: string): void {
     const sec = this.pal.querySelector<HTMLElement>(`.rbk-pal-sec[data-group="${esc(group)}"]`);
     if (!sec) return;
+    if (this.element.classList.contains('rbk-narrow')) {
+      this.narrowGroup = group;
+      this.applyGroupTabs();
+      this.pal.scrollTop = 0;
+      return;
+    }
     const box = this.pal.getBoundingClientRect();
     const r = sec.getBoundingClientRect();
-    if (this.element.classList.contains('rbk-narrow')) this.pal.scrollLeft += r.left - box.left - 6;
-    else this.pal.scrollTop += r.top - box.top - 4;
+    this.pal.scrollTop += r.top - box.top - 4;
     for (const c of this.cats.querySelectorAll<HTMLElement>('.rbk-cat')) c.setAttribute('aria-current', c.getAttribute('data-cat') === group ? 'true' : 'false');
   }
 
@@ -1486,6 +1513,8 @@ export class BlockEditor {
     } else return;
     e.preventDefault();
     if (next) {
+      const sec = next.closest<HTMLElement>('.rbk-pal-sec');
+      if (sec?.hidden) this.showGroup(sec.getAttribute('data-group') ?? '');
       next.focus();
       next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }

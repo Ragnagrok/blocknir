@@ -74,6 +74,11 @@ export interface PoseInfo {
   action?: string;
   /** The action's arguments. */
   args?: readonly Value[];
+  /**
+   * Grid: what the robot holds right now, on every clip. A character can keep a lasting pose with it
+   * (still lying in the hammock between two actions) instead of standing up for `idle`.
+   */
+  inventory?: Readonly<Record<string, number>>;
 }
 
 /** An animated character: the robot, the turtle, the player and other actors. */

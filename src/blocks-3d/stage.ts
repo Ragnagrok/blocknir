@@ -62,11 +62,21 @@ export class Mover {
   clipTime = 0;
   /** What the clip is for (the level action of an `action` clip). */
   info: PoseInfo | undefined = undefined;
+  /** What holds between clips (the grid robot's inventory); merged under `info`. */
+  rest: PoseInfo | undefined = undefined;
   /** Extra tilt (bumps), radians around x. */
   tilt = 0;
   scale = 1;
+  /**
+   * Seconds (clip time) a new clip takes to blend in from the pose on screen, so changing clips
+   * (walk → idle → light…) never snaps the limbs in one frame. 0 cuts at once.
+   */
+  blend = 0.14;
   /** After a one-shot clip, go back to this one. */
   private after: { clip: string; at: number } | null = null;
+  /** The pose being blended out: every part under the character's object, as it was on screen. */
+  private fade: { nodes: THREE.Object3D[]; from: Float32Array; t: number } | null = null;
+  private posed = false;
 
   constructor(readonly visual: CharacterVisual) {}
 
@@ -75,9 +85,49 @@ export class Mover {
       this.clip = clip;
       this.clipTime = 0;
       this.info = info;
+      this.fadeOut();
     }
     this.after = null;
   }
+
+  /** Shows the next pose as it is, without blending (a reset, a new run). */
+  cut(): void {
+    this.fade = null;
+  }
+
+  /** Keeps the pose on screen to blend from. */
+  private fadeOut(): void {
+    if (this.blend <= 0 || !this.posed) return;
+    const root = this.visual.object;
+    const nodes: THREE.Object3D[] = [];
+    root.traverse((o) => {
+      if (o !== root) nodes.push(o);
+    });
+    const from = new Float32Array(nodes.length * 10);
+    nodes.forEach((o, i) => {
+      o.position.toArray(from, i * 10);
+      o.quaternion.toArray(from, i * 10 + 3);
+      o.scale.toArray(from, i * 10 + 7);
+    });
+    this.fade = { nodes, from, t: 0 };
+  }
+
+  /** Mixes the pose just set with the one kept, `k` of the way to the new one. */
+  private mix(k: number): void {
+    const f = this.fade!;
+    const q = Mover.q;
+    const v = Mover.v;
+    f.nodes.forEach((o, i) => {
+      if (!o.parent) return;
+      const a = i * 10;
+      o.position.copy(v.fromArray(f.from, a).lerp(o.position, k));
+      o.quaternion.copy(q.fromArray(f.from, a + 3).slerp(o.quaternion, k));
+      o.scale.copy(v.fromArray(f.from, a + 7).lerp(o.scale, k));
+    });
+  }
+
+  private static readonly q = new THREE.Quaternion();
+  private static readonly v = new THREE.Vector3();
 
   /** Plays `clip` for `seconds` (clip time), then `then`. */
   once(clip: string, seconds: number, then = 'idle', info?: PoseInfo): void {
@@ -98,12 +148,21 @@ export class Mover {
       this.clip = next;
       this.clipTime = 0;
       this.info = undefined;
+      this.fadeOut();
     }
     const o = this.visual.object;
     o.position.set(this.x, this.y, this.z);
     o.rotation.set(this.tilt, this.heading, 0, 'YXZ');
     o.scale.setScalar(this.scale);
-    this.visual.pose(this.clip, this.clipTime, this.info);
+    const info = this.rest && this.info ? { ...this.rest, ...this.info } : (this.info ?? this.rest);
+    this.visual.pose(this.clip, this.clipTime, info);
+    if (this.fade) {
+      this.fade.t += dt;
+      const k = this.fade.t / this.blend;
+      if (k >= 1) this.fade = null;
+      else this.mix(k * k * (3 - 2 * k));
+    }
+    this.posed = true;
   }
 
   /** Where speech bubbles go. */
