@@ -32,6 +32,12 @@ import {
 } from '../blocks/index.js';
 import { stripParens } from './template.js';
 
+/** The slot of a procedure's parameter `i` (`any` when it has no type). */
+export function paramSpecOf(proc: Procedure | null | undefined, i: number): ParamSpec {
+  const t = proc?.types?.[i];
+  return t ? (t.name ? { type: t.type, name: t.name } : { type: t.type }) : { type: 'any' };
+}
+
 /** Palette groups, in the order children see them. */
 export type Group = 'actions' | 'control' | 'sensors' | 'values' | 'variables' | 'procedures' | 'events';
 
@@ -93,6 +99,12 @@ export class Schema {
   readonly catalog: Catalog;
   readonly entries: readonly PaletteEntry[];
 
+  /**
+   * The program being edited, for the slots of calls and the type of parameters (procedure
+   * parameters may have types). The model keeps it up to date.
+   */
+  program: Program | null = null;
+
   constructor(level: Level, overrides?: LabelOverrides) {
     this.level = level;
     this.labels = overrides ? mergeLabels(labelsFor(level), overrides) : labelsFor(level);
@@ -147,8 +159,10 @@ export class Schema {
         const spec = this.catalog.sensors[node.sensor];
         return node.args.map((_, i) => spec?.params[i] ?? any);
       }
-      case 'call':
-        return node.args.map(() => any);
+      case 'call': {
+        const proc = this.program?.procedures?.find((p) => p.name === node.procedure);
+        return node.args.map((_, i) => paramSpecOf(proc, i));
+      }
       case 'repeat':
         return [n];
       case 'wait':
@@ -195,10 +209,50 @@ export class Schema {
         return 'name';
       case 'sensor':
         return this.catalog.sensors[e.sensor]?.returns ?? 'any';
-      case 'var':
       case 'param':
+        return this.paramType(e.name);
+      case 'var':
         return 'any';
     }
+  }
+
+  /**
+   * What a parameter gives: its type, when every procedure with a parameter of that name agrees
+   * (a parameter is only used inside its own procedure); otherwise `any`.
+   */
+  paramType(name: string): ValueType {
+    const found = new Set<ValueType>();
+    for (const p of this.program?.procedures ?? []) {
+      const i = p.params.indexOf(name);
+      if (i >= 0) found.add(paramSpecOf(p, i).type);
+    }
+    return found.size === 1 ? [...found][0]! : 'any';
+  }
+
+  /**
+   * The types a new parameter can take in this level: a number, and what the toolbox's own blocks
+   * take (a direction, an item, a color…), plus true or false when there are conditions. The first
+   * one is the default.
+   */
+  paramTypes(): ParamSpec[] {
+    const out: ParamSpec[] = [{ type: 'number' }];
+    const seen = new Set(['number']);
+    let conditions = false;
+    for (const e of this.entries) {
+      if (e.key === 'if' || e.key === 'repeatUntil') conditions = true;
+      if (e.category !== 'command' && e.category !== 'sensor') continue;
+      for (const sp of e.params) {
+        if (sp.type === 'any' || sp.type === 'number' || sp.type === 'boolean') continue;
+        const k = sp.type === 'name' ? `name:${sp.name ?? ''}` : sp.type;
+        if (seen.has(k)) continue;
+        // A name slot with nothing to choose from (no items on the board) is no use as a type.
+        if (sp.type === 'name' && !this.choices(sp).length) continue;
+        seen.add(k);
+        out.push(sp.type === 'name' && sp.name ? { type: 'name', name: sp.name } : { type: sp.type });
+      }
+    }
+    if (conditions) out.push({ type: 'boolean' });
+    return out;
   }
 
   /** Whether a reporter giving `given` may go in a slot of type `slot`. */
@@ -285,6 +339,11 @@ export class Schema {
   // Palette
   // -------------------------------------------------------------------------------------------
 
+  /** What a call's slot starts with: a value of the parameter's type (1 when it has no type). */
+  callArg(id: string, spec: ParamSpec): Expr {
+    return spec.type === 'any' ? { id, kind: 'number', value: 1 } : this.emptyExpr(id, spec);
+  }
+
   /** The palette items for the current program, grouped and in a stable order. */
   templates(program: Program, ctx: PaletteContext): BlockTemplate[] {
     const out: BlockTemplate[] = [];
@@ -319,11 +378,11 @@ export class Schema {
             out.push({ ...base, id: 'procedure:new', shape: 'hat', creates: 'procedure' });
           } else if (e.key === 'call') {
             for (const p of program.procedures ?? []) {
-              out.push({ ...base, id: `call:${p.name}`, shape: 'stack', procedure: p.name, params: p.params.map(() => ({ type: 'any' })) });
+              out.push({ ...base, id: `call:${p.name}`, shape: 'stack', procedure: p.name, params: p.params.map((_, i) => paramSpecOf(p, i)) });
             }
           } else if (e.key === 'param' && ctx.procedure) {
             for (const name of ctx.procedure.params) {
-              out.push({ ...base, id: `param:${name}`, shape: 'reporter', returns: 'any', param: name, procedure: ctx.procedure.name });
+              out.push({ ...base, id: `param:${name}`, shape: 'reporter', returns: paramSpecOf(ctx.procedure, ctx.procedure.params.indexOf(name)).type, param: name, procedure: ctx.procedure.name });
             }
           }
           break;
@@ -386,7 +445,7 @@ export class Schema {
       case 'param':
         return { id, kind: 'param', name: t.param ?? '' };
       case 'call':
-        return { id, kind: 'call', procedure: t.procedure ?? '', args: t.params.map(() => ({ id: nextId(), kind: 'number', value: 1 })) };
+        return { id, kind: 'call', procedure: t.procedure ?? '', args: t.params.map((p) => this.callArg(nextId(), p)) };
       case 'procedure':
         return null;
       case '+':

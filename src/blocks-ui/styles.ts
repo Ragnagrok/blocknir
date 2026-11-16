@@ -195,6 +195,8 @@ export const CSS = `
 .rbk-rep { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 40px; max-width: 100%; padding: 3px 14px; border-radius: 999px; background: var(--rbk-cat); color: var(--rbk-on-block); font-weight: 700; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.22), 0 0 0 1px var(--rbk-block-edge); touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: grab; outline: none; }
 .rbk-bool { border-radius: 6px; padding: 3px 22px; clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 16px 100%, 0 50%); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.22); }
 .rbk-param { --rbk-cat: var(--rbk-c-param); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55); }
+.rbk-ptype { font-size: 0.72em; font-weight: 600; opacity: 0.8; }
+.rbk-ptype::before { content: '· '; }
 
 /* ---------- slots ---------- */
 .rbk-slot { display: inline-flex; align-items: center; min-height: 40px; max-width: 100%; border-radius: 999px; }

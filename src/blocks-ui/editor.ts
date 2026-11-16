@@ -13,7 +13,7 @@
  * - **keyboard**: arrows move through gaps and blocks (the cursor follows), Enter or Space acts,
  *   Delete removes, Alt+arrows move a block, Ctrl+Z / Ctrl+Y undo and redo.
  */
-import { analyze, childExprs, type Expr, type EventSpec, type LabelOverrides, type Level, type NodeId, type Program, type Statement, type Value, type ValueType } from '../blocks/index.js';
+import { analyze, childExprs, type Expr, type EventSpec, type LabelOverrides, type Level, type NodeId, type ParamSpec, type Program, type Statement, type Value, type ValueType } from '../blocks/index.js';
 import { Dialogs, swatchOf, type BlockOption, type PickOption } from './dialogs.js';
 import { h, icon } from './dom.js';
 import {
@@ -36,9 +36,9 @@ import {
   type Spot,
 } from './model.js';
 import { Renderer } from './render.js';
-import { GROUP_ORDER, isHole, Schema, type BlockTemplate, type Group } from './schema.js';
+import { GROUP_ORDER, isHole, paramSpecOf, Schema, type BlockTemplate, type Group } from './schema.js';
 import { injectStyles } from './styles.js';
-import { fmt, mergeText, type DeepPartial, type UiText } from './text.js';
+import { fmt, mergeText, paramTypeName, type DeepPartial, type UiText } from './text.js';
 
 export type Theme = 'light' | 'dark' | 'auto';
 
@@ -683,7 +683,8 @@ export class BlockEditor {
   private paramTemplate(procId: NodeId, name: string): BlockTemplate | null {
     const proc = this.model.program.procedures?.find((p) => p.id === procId);
     if (!proc || !proc.params.includes(name)) return null;
-    return { id: `param:${name}`, key: 'param', group: 'procedures', shape: 'reporter', label: '{name}', params: [], returns: 'any', param: name, procedure: proc.name };
+    const returns = paramSpecOf(proc, proc.params.indexOf(name)).type;
+    return { id: `param:${name}`, key: 'param', group: 'procedures', shape: 'reporter', label: '{name}', params: [], returns, param: name, procedure: proc.name };
   }
 
   private onPointerDown(e: PointerEvent): void {
@@ -1306,7 +1307,25 @@ export class BlockEditor {
     const proc = this.model.program.procedures?.find((p) => p.id === procId);
     if (!proc) return;
     const name = await this.askName(this.text.nameParam, this.unique(this.text.defaultParam, proc.params), (v) => (proc.params.includes(v) ? (this.text.refused.duplicateName ?? '') : null));
-    if (name) this.result(this.model.addParam(procId, name));
+    if (!name) return;
+    // What goes in it: asked only when the level offers more than numbers.
+    const types = this.schema.paramTypes();
+    let type: ParamSpec | null = types[0] ?? null;
+    if (types.length > 1) {
+      type = await this.askParamType(name, types, null);
+      if (!type) return;
+    }
+    this.result(this.model.addParam(procId, name, type ?? undefined));
+  }
+
+  /** Asks what a parameter takes, among the level's types. Null when cancelled. */
+  private async askParamType(name: string, types: ParamSpec[], current: ParamSpec | null): Promise<ParamSpec | null> {
+    const same = (a: ParamSpec, b: ParamSpec | null): boolean => !!b && a.type === b.type && (a.name ?? '') === (b.name ?? '');
+    const r = await this.dialogs.picker({
+      title: fmt(this.text.paramTypeTitle, { name }),
+      options: types.map((t, i) => ({ label: paramTypeName(this.text, t), value: i, pressed: same(t, current) })),
+    });
+    return r?.type === 'value' && typeof r.value === 'number' ? (types[r.value] ?? null) : null;
   }
 
   /** Deletes a procedure (asking first when blocks call it) or a handler. */
@@ -1460,6 +1479,16 @@ export class BlockEditor {
           if (v && v !== name) this.result(this.model.renameParam(procId, name, v));
         },
       },
+      ...(this.schema.paramTypes().length > 1
+        ? [{ label: t.paramTypeMenu, icon: 'edit', run: async () => {
+            const types = this.schema.paramTypes();
+            const current = paramSpecOf(proc, proc.params.indexOf(name));
+            // A type the level does not list (made elsewhere) still shows, chosen.
+            if (current.type !== 'any' && !types.some((x) => x.type === current.type && (x.name ?? '') === (current.name ?? ''))) types.push(current);
+            const v = await this.askParamType(name, types, current);
+            if (v) this.result(this.model.setParamType(procId, name, v));
+          } }]
+        : []),
       { label: t.removeParam, icon: 'minus', danger: true, run: () => void this.result(this.model.removeParam(procId, name)) },
     ]);
   }

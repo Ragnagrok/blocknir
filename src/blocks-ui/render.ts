@@ -10,9 +10,9 @@
  */
 import { childExprs, formatNumber, type Expr, type Handler, type Procedure, type Statement } from '../blocks/index.js';
 import { getList, innerLists, isExpr, listKey, sameList, type EditorModel, type ListRef } from './model.js';
-import { groupOfNode, isHole, shapeOfNode, type BlockTemplate, type Schema } from './schema.js';
+import { groupOfNode, isHole, paramSpecOf, shapeOfNode, type BlockTemplate, type Schema } from './schema.js';
 import { fillTemplate, parseTemplate, templateSlots, type Segment } from './template.js';
-import { fmt, type UiText } from './text.js';
+import { fmt, paramTypeName, type UiText } from './text.js';
 import { h, icon } from './dom.js';
 
 export class Renderer {
@@ -121,23 +121,27 @@ export class Renderer {
       }
     }
     if (!preview) {
-      for (const name of proc.params) {
+      proc.params.forEach((name, i) => {
+        // A typed parameter shows what it takes, small, after its name (`pasos · número`).
+        const spec = paramSpecOf(proc, i);
+        const kind = spec.type === 'any' ? '' : paramTypeName(this.text, spec, true);
         row.append(
           h(
             'span',
             {
-              class: 'rbk-rep rbk-g-procedures rbk-param',
+              class: `rbk-rep rbk-g-procedures rbk-param${spec.type === 'boolean' ? ' rbk-bool' : ''}`,
               'data-param': name,
               'data-proc': proc.id,
               'data-fk': `pa:${proc.id}:${name}`,
               role: 'button',
               tabindex: -1,
-              'aria-label': fmt(this.text.paramChip, { name }),
+              'aria-label': fmt(this.text.paramChip, { name }) + (kind ? ` (${kind})` : ''),
             },
             h('span', { class: 'rbk-txt' }, name),
+            ...(kind ? [h('span', { class: 'rbk-ptype' }, kind)] : []),
           ),
         );
-      }
+      });
       if (this.schema.parameters) {
         row.append(
           h('span', { class: 'rbk-add', 'data-action': 'addParam', 'data-node': proc.id, 'data-fk': `ap:${proc.id}`, role: 'button', tabindex: -1, 'aria-label': this.text.addParam }, icon('plus', 18)),

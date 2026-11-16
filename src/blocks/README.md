@@ -81,7 +81,12 @@ Expressions (`Expr`): literals `number`, `boolean`, `direction`, `name` (slot va
 `param` (a procedure parameter), `var`, `sensor` (`sensor`, `args`), `arith` (`+ - * / %`),
 `compare` (`= != < <= > >=`), `and`, `or`, `not`, `dirOp` (`opposite`, `left`, `right`).
 
-`Procedure { id, name, params: string[], body }`. Procedures may call each other and recurse.
+`Procedure { id, name, params: string[], types?, body }`. Procedures may call each other and recurse.
+`types` (optional, parallel to `params`) says what each parameter takes, like a command's slots:
+`[{ type: 'direction' }, { type: 'name', name: 'item' }]`. Editors offer values of that type in
+the call's slots (`blocks-ui`: `Schema.paramTypes()` lists the ones a level's blocks use, and
+`EditorModel.addParam(id, name, type)` / `setParamType`); a call that passes a value of another
+type stops with `argType`. Without `types`, parameters take anything.
 `Handler { id, event, body }` with `event` one of `{type:'start'}`, `{type:'key', key}`,
 `{type:'tick', every?}`, `{type:'touch', what}` (an actor kind or a tile name).
 

@@ -241,7 +241,12 @@ function* execCall<E>(env: ExecEnv<E>, s: CallStmt, frame: Frame): Generator<Sig
   }
   if (frame.depth + 1 > env.maxDepth) throw new BlockError('recursionDepth', { limit: env.maxDepth }, s.id);
   const params = new Map<string, Value>();
-  p.params.forEach((name, i) => params.set(name, evalExpr(env, s.args[i]!, frame)));
+  p.params.forEach((name, i) => {
+    const v = evalExpr(env, s.args[i]!, frame);
+    const t = p.types?.[i]?.type ?? 'any';
+    if (!fitsType(v, t)) throw new BlockError('argType', { name: p.name, expected: env.labels.types[t], position: i + 1 }, s.args[i]!.id);
+    params.set(name, v);
+  });
   yield step(env, { node: s.id, kind: 'call', events: [] });
   env.stack.push(s.id);
   try {

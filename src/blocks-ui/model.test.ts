@@ -377,6 +377,57 @@ describe('model: procedures, parameters and variables', () => {
     expect(body2.times.kind).toBe('number');
   });
 
+  it('typed parameters: the call offers values of that type, the use fits only where that type goes', () => {
+    const { model, schema, stmt, make } = setup();
+    expect(schema.paramTypes()).toEqual([{ type: 'number' }, { type: 'direction' }, { type: 'name', name: 'item' }, { type: 'boolean' }]);
+    const p = model.addProcedure('ir');
+    const procId = p.ok ? p.id! : '';
+    expect(model.addParam(procId, 'hacia', { type: 'direction' }).ok).toBe(true);
+    expect(model.program.procedures![0]!.types).toEqual([{ type: 'direction' }]);
+    // In the body: the parameter goes in Mover's slot, not in Repetir's.
+    const mv = stmt('command:move');
+    model.insert(mv);
+    expect(model.putExpr(make('param:hacia'), { parent: mv.id, slot: 0 }).ok).toBe(true);
+    const r = stmt('control:repeat');
+    model.insert(r);
+    expect(model.putExpr(make('param:hacia'), { parent: r.id, slot: 0 })).toEqual({ ok: false, reason: 'type' });
+    // The call starts with a direction and offers directions.
+    model.setCursor({ list: main, index: 0 });
+    const call = stmt('call:ir');
+    model.insert(call);
+    expect(call.kind === 'call' && call.args[0]).toMatchObject({ kind: 'direction' });
+    expect(schema.slots(model.program.main[0]!)).toEqual([{ type: 'direction' }]);
+    expect(schema.choices(schema.slots(model.program.main[0]!)[0]!)).toEqual(['N', 'E', 'S', 'W']);
+    expect(model.setValue({ parent: call.id, slot: 0 }, 5)).toEqual({ ok: false, reason: 'type' });
+    expect(model.setValue({ parent: call.id, slot: 0 }, 'S').ok).toBe(true);
+    expect(analyze(model.getProgram(), catalogFor(lamps), lamps.toolbox)).toEqual([]);
+    // A second one, untyped: the types stay parallel.
+    expect(model.addParam(procId, 'algo').ok).toBe(true);
+    expect(model.program.procedures![0]!.types).toEqual([{ type: 'direction' }, { type: 'any' }]);
+    expect(model.removeParam(procId, 'algo').ok).toBe(true);
+    // Now a number: the calls start over with a number and the use in Mover becomes a hole.
+    expect(model.setParamType(procId, 'hacia', { type: 'number' }).ok).toBe(true);
+    expect((model.program.main[0] as Extract<Statement, { kind: 'call' }>).args[0]).toMatchObject({ kind: 'number' });
+    const body = model.program.procedures![0]!.body[0] as Extract<Statement, { kind: 'command' }>;
+    expect(body.args[0]!.kind).not.toBe('param');
+    model.undo();
+    expect(model.program.procedures![0]!.types).toEqual([{ type: 'direction' }]);
+    // Back to no type at all: the field goes away.
+    expect(model.setParamType(procId, 'hacia', { type: 'any' }).ok).toBe(true);
+    expect(model.program.procedures![0]!.types).toBeUndefined();
+  });
+
+  it('typed parameters: a call with a value of another type stops the run', () => {
+    const program: Program = {
+      main: [{ id: 'c', kind: 'call', procedure: 'ir', args: [{ id: 'v', kind: 'number', value: 3 }] }],
+      procedures: [{ id: 'p', name: 'ir', params: ['hacia'], types: [{ type: 'direction' }], body: [{ id: 'm', kind: 'command', command: 'move', args: [{ id: 'h', kind: 'param', name: 'hacia' }] }] }],
+    };
+    const r = runCase(lamps, program);
+    expect(r.error?.code).toBe('argType');
+    expect(r.error?.nodeId).toBe('v');
+    expect(r.error?.message).toBe('"ir" esperaba una dirección en el hueco 1.');
+  });
+
   it('variables: created ones are offered, set blocks can switch variable', () => {
     const { model, stmt, make } = setup();
     expect(model.addVariable('pasos').ok).toBe(true);

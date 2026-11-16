@@ -23,6 +23,15 @@ export interface UiText {
   rename: string;
   addParam: string;
   removeParam: string;
+  /** Menu entry of a parameter: change what it takes. */
+  paramTypeMenu: string;
+  /** Title of the type picker. `{name}`. */
+  paramTypeTitle: string;
+  /**
+   * What a parameter takes, by type, or `name:<hint>` for names (`name:item`, `name:color`). The
+   * picker shows these; the chip shows them without the article (`número`).
+   */
+  paramTypes: Record<string, string>;
   deleteProcedure: string;
   deleteHandler: string;
   newVariable: string;
@@ -89,6 +98,24 @@ export const DEFAULT_TEXT: UiText = {
   rename: 'Cambiar nombre',
   addParam: 'Agregar hueco',
   removeParam: 'Quitar hueco',
+  paramTypeMenu: 'Qué va en el hueco',
+  paramTypeTitle: '¿Qué va en el hueco “{name}”?',
+  paramTypes: {
+    number: 'Un número',
+    direction: 'Una dirección',
+    boolean: 'Verdadero o falso',
+    name: 'Un nombre',
+    any: 'Cualquier cosa',
+    'name:item': 'Un objeto',
+    'name:color': 'Un color',
+    'name:terrain': 'Un piso',
+    'name:key': 'Una tecla',
+    'name:kind': 'Una cosa del juego',
+    'name:tile': 'Una baldosa',
+    'name:signal': 'Una señal',
+    'name:sound': 'Un sonido',
+    'name:look': 'Un aspecto',
+  },
   deleteProcedure: 'Borrar enseñanza',
   deleteHandler: 'Borrar evento',
   newVariable: 'Nueva variable…',
@@ -146,7 +173,15 @@ export function mergeText(over: DeepPartial<UiText> | undefined): UiText {
     ...over,
     groups: { ...DEFAULT_TEXT.groups, ...over.groups },
     refused: { ...DEFAULT_TEXT.refused, ...over.refused },
+    paramTypes: { ...DEFAULT_TEXT.paramTypes, ...over.paramTypes },
   } as UiText;
+}
+
+/** What a parameter takes, in words (`Un objeto`); `short` drops the article (`objeto`). */
+export function paramTypeName(text: UiText, spec: { type: string; name?: string }, short = false): string {
+  const t = text.paramTypes;
+  const s = (spec.type === 'name' && spec.name ? t[`name:${spec.name}`] : undefined) ?? t[spec.type] ?? spec.type;
+  return short ? s.replace(/^(un|una|unos|unas)\s+/i, '') : s;
 }
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends Record<string, string> ? Partial<T[K]> : T[K] };

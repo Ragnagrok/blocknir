@@ -3,7 +3,7 @@
  * editor keeps across edits, so the interpreter can point at the block that is running or that
  * failed.
  */
-import type { Direction } from './values.js';
+import type { Direction, ValueType } from './values.js';
 
 /** A stable node id. Unique within one program. */
 export type NodeId = string;
@@ -201,6 +201,12 @@ export interface Procedure {
   name: string;
   /** Parameter names, in call order. */
   params: string[];
+  /**
+   * What each parameter takes, parallel to `params` (missing or shorter: `any`). The same shape
+   * as a command's slots: `{ type: 'direction' }`, `{ type: 'name', name: 'color' }`. Editors offer
+   * values of that type in the call's slot; a call with a value of another type stops the run.
+   */
+  types?: Array<{ type: ValueType; name?: string }>;
   body: Statement[];
 }
 

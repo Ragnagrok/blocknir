@@ -17,12 +17,13 @@ import {
   type Handler,
   type Node,
   type NodeId,
+  type ParamSpec,
   type Procedure,
   type Program,
   type Statement,
   type Value,
 } from '../blocks/index.js';
-import { hole, type Schema } from './schema.js';
+import { hole, paramSpecOf, type Schema } from './schema.js';
 
 // ---------------------------------------------------------------------------------------------
 // Places in a program
@@ -381,7 +382,15 @@ export interface ModelOptions {
 
 export class EditorModel {
   readonly schema: Schema;
-  private current: Program;
+  private cur!: Program;
+  /** The program; the schema follows it (slots of calls, types of parameters). */
+  private get current(): Program {
+    return this.cur;
+  }
+  private set current(p: Program) {
+    this.cur = p;
+    this.schema.program = p;
+  }
   private cursorSpot: Spot = { list: { kind: 'main' }, index: 0 };
   private extraVars: string[];
   private undoStack: Snapshot[] = [];
@@ -774,18 +783,63 @@ export class EditorModel {
     });
   }
 
-  /** Adds a parameter; every call gets a new slot. */
-  addParam(procId: NodeId, name: string): EditResult {
+  /**
+   * Adds a parameter; every call gets a new slot. With `type`, the slot takes values of that type
+   * (`Schema.paramTypes()` lists the ones that make sense in the level) and starts with one.
+   */
+  addParam(procId: NodeId, name: string, type?: ParamSpec): EditResult {
     const n = name.trim();
     if (!n) return no('name');
     return this.edit('addParam', procId, (p) => {
       const proc = p.procedures!.find((x) => x.id === procId);
       if (!proc) return no('notFound');
       if (proc.params.includes(n)) return no('duplicateName');
+      if (type && type.type !== 'any') {
+        proc.types = proc.params.map((_, i) => proc.types?.[i] ?? { type: 'any' });
+        proc.types.push(type.name ? { type: type.type, name: type.name } : { type: type.type });
+      } else if (proc.types) proc.types.push({ type: 'any' });
       proc.params.push(n);
+      const spec = paramSpecOf(proc, proc.params.length - 1);
       walkProgram(p, (node) => {
-        if ('kind' in node && node.kind === 'call' && node.procedure === proc.name) node.args.push({ id: this.newIdFor(p), kind: 'number', value: 1 });
+        if ('kind' in node && node.kind === 'call' && node.procedure === proc.name) node.args.push(this.schema.callArg(this.newIdFor(p), spec));
       });
+      return { ok: true, id: procId };
+    });
+  }
+
+  /**
+   * Changes what a parameter takes. Every call's slot starts over with a value of the new type,
+   * and the parameter's uses that no longer fit where they are become holes.
+   */
+  setParamType(procId: NodeId, name: string, type: ParamSpec): EditResult {
+    return this.edit('paramType', procId, (p) => {
+      const proc = p.procedures!.find((x) => x.id === procId);
+      if (!proc) return no('notFound');
+      const i = proc.params.indexOf(name);
+      if (i < 0) return no('notFound');
+      const was = paramSpecOf(proc, i);
+      if (was.type === type.type && (was.name ?? '') === (type.name ?? '')) return no('invalid');
+      proc.types = proc.params.map((_, j) => proc.types?.[j] ?? { type: 'any' });
+      proc.types[i] = type.name ? { type: type.type, name: type.name } : { type: type.type };
+      if (proc.types.every((t) => t.type === 'any')) delete proc.types;
+      const spec = paramSpecOf(proc, i);
+      walkProgram(p, (node) => {
+        if ('kind' in node && node.kind === 'call' && node.procedure === proc.name && node.args[i]) node.args[i] = this.schema.callArg(this.newIdFor(p), spec);
+      });
+      const misfits: string[] = [];
+      for (const s of proc.body) {
+        for (const node of subtree(s)) {
+          if (!('kind' in node)) continue;
+          const specs = this.schema.slots(node);
+          childExprs(node).forEach((c, j) => {
+            if (c.kind === 'param' && c.name === name && specs[j] && !this.schema.fits(this.schema.returns(c), specs[j]!.type)) misfits.push(c.id);
+          });
+        }
+      }
+      for (const use of misfits) {
+        const slot = locateExpr(p, use);
+        if (slot) this.resetSlot(p, slot);
+      }
       return { ok: true, id: procId };
     });
   }
@@ -815,6 +869,10 @@ export class EditorModel {
       const i = proc.params.indexOf(name);
       if (i < 0) return no('notFound');
       proc.params.splice(i, 1);
+      if (proc.types) {
+        proc.types.splice(i, 1);
+        if (proc.types.every((t) => t.type === 'any')) delete proc.types;
+      }
       walkProgram(p, (node) => {
         if ('kind' in node && node.kind === 'call' && node.procedure === proc.name) node.args.splice(i, 1);
       });
@@ -948,7 +1006,14 @@ export class EditorModel {
     const before = this.snapshot();
     const beforeCursor = this.cursorAnchor();
     const vars = [...this.extraVars];
-    const r = fn(draft);
+    // The schema reads the draft while the edit runs (a parameter's new type), then the program.
+    this.schema.program = draft;
+    let r: EditResult;
+    try {
+      r = fn(draft);
+    } finally {
+      this.schema.program = this.current;
+    }
     if (!r.ok) {
       this.cursorSpot = before.cursor;
       this.extraVars = vars;

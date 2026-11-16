@@ -18,7 +18,7 @@ import {
 } from '../blocks/index.js';
 import { buildFloor, cellCenter, place, type Floor } from './assets.js';
 import { boardBounds, type Bounds } from './framing.js';
-import { layoutCell, type CellEntry } from './layout.js';
+import { layoutCell, type CellEntry, type Placement, type Room } from './layout.js';
 import { angleDelta, badgeTexture, copyObject, Bubble, clamp01, disposeObject, easeInOut, easeOut, easeOutBack, headingOf, InstancedTemplate, ScreenSprite, span } from './pieces.js';
 import { labelSprite } from './default-skin.js';
 import { Mover, StepShow, type Beat, type StageContext, type StepStage } from './stage.js';
@@ -65,6 +65,10 @@ export class GridStage implements StepStage<GridEvent> {
   /** Loose objects in flight (picked or dropped items). */
   private flying: THREE.Object3D[] = [];
   private show: StepShow | null = null;
+  /** Cells whose items stand aside for the character: the side chosen when it came in. */
+  private away = new Map<number, [number, number]>();
+  /** The room the last rebuild used, to rebuild only when it changes. */
+  private roomKey = '';
   private time = 0;
   private readonly tmpColor = new THREE.Color();
 
@@ -189,6 +193,8 @@ export class GridStage implements StepStage<GridEvent> {
     this.pops.clear();
     this.fades.clear();
     this.litOrder = [];
+    this.away.clear();
+    this.roomKey = '';
     this.show = null;
     this.clearFlying();
     this.bubble.clear();
@@ -319,6 +325,9 @@ export class GridStage implements StepStage<GridEvent> {
             m.once('pick', 0.9);
             this.carriedFrozen = true;
             loose = this.loose(e.item);
+            // From where the item stands (aside, in a corner of the cell), not from the cell center.
+            const spot = this.spotOf(e.x, e.y, e.item);
+            if (spot) start.set(start.x + spot.x, start.y + spot.y, start.z + spot.z);
             loose.position.copy(start);
             this.apply(e);
           },
@@ -349,6 +358,9 @@ export class GridStage implements StepStage<GridEvent> {
             loose.position.copy(m.top());
             this.hold.set(hk, (this.hold.get(hk) ?? 0) + 1);
             this.apply(e);
+            // It lands where the layout puts it (aside, while the character stands there).
+            const spot = this.spotOf(e.x, e.y, e.item, true);
+            if (spot) end.set(end.x + spot.x, end.y + spot.y, end.z + spot.z);
           },
           update: (k) => {
             if (!loose) return;
@@ -526,6 +538,8 @@ export class GridStage implements StepStage<GridEvent> {
       if (next > 0.45) this.pops.delete(k);
       else this.pops.set(k, next);
     }
+    const rk = this.roomSignature();
+    if (rk !== this.roomKey) this.dirty = true;
     if (this.dirty || this.pops.size || this.fades.size) this.rebuild();
     this.dirty = false;
     if (this.carriedDirty && !this.carriedFrozen) this.rebuildCarried();
@@ -551,24 +565,13 @@ export class GridStage implements StepStage<GridEvent> {
     const badges: Array<{ text: string; x: number; y: number; z: number }> = [];
     const lit: Array<{ x: number; y: number; z: number; floor: number; color: number; size: number; key: string }> = [];
     const m4 = new THREE.Matrix4();
+    this.roomKey = this.roomSignature();
     for (let y = 0; y < s.height; y++) {
       for (let x = 0; x < s.width; x++) {
-        const cell = s.cells[x + y * s.width]!;
-        const entries: CellEntry[] = [];
-        for (const [name, count0] of Object.entries(cell.items)) {
-          const count = count0 - (this.hold.get(key(x, y, name)) ?? 0);
-          if (count <= 0) continue;
-          const asset = a.item(name);
-          if (asset.def.hidden) continue;
-          const e: CellEntry = { name, count, height: asset.height };
-          if (asset.def.floor) e.floor = true;
-          if (asset.def.pile) e.pile = asset.def.pile;
-          if (asset.def.stackStep !== undefined) e.stackStep = asset.def.stackStep;
-          entries.push(e);
-        }
+        const entries = this.entriesAt(x, y);
         if (!entries.length) continue;
         const [cx, cy, cz] = this.cell(x, y);
-        const { placements, badges: b } = layoutCell(entries);
+        const { placements, badges: b } = layoutCell(entries, undefined, this.roomAt(x, y));
         for (const p of placements) {
           const age = this.pops.get(key(x, y, p.name));
           const pop = age === undefined ? 1 : easeOutBack(clamp01(age / 0.4));
@@ -672,6 +675,77 @@ export class GridStage implements StepStage<GridEvent> {
         light.position.set(l.x, l.y + 0.15, l.z + 0.1);
       }
     });
+  }
+
+  /** The items drawn in a cell, for the layout. `held`: also the copies still falling into it. */
+  private entriesAt(x: number, y: number, held = false): CellEntry[] {
+    const a = this.ctx.assets;
+    const cell = this.state.cells[x + y * this.state.width]!;
+    const entries: CellEntry[] = [];
+    for (const [name, count0] of Object.entries(cell.items)) {
+      const count = count0 - (held ? 0 : this.hold.get(key(x, y, name)) ?? 0);
+      if (count <= 0) continue;
+      const asset = a.item(name);
+      if (asset.def.hidden) continue;
+      const e: CellEntry = { name, count, height: asset.height };
+      if (asset.def.floor) e.floor = true;
+      if (asset.def.pile) e.pile = asset.def.pile;
+      if (asset.def.stackStep !== undefined) e.stackStep = asset.def.stackStep;
+      if (asset.def.stay) e.stay = true;
+      entries.push(e);
+    }
+    return entries;
+  }
+
+  /** Where an item stands in its cell, from the cell center (the first copy). */
+  private spotOf(x: number, y: number, name: string, held = false): Placement | null {
+    const { placements } = layoutCell(this.entriesAt(x, y, held), undefined, this.roomAt(x, y));
+    return placements.find((p) => p.name === name) ?? null;
+  }
+
+  /**
+   * How much the items of a cell make room for the character: 1 while it stands on the cell, 0 once
+   * it is a cell away, eased between, so the items slide aside as it walks in and back as it leaves.
+   * The side they go to is chosen when it comes near (away from where it comes from) and kept.
+   */
+  private roomAt(x: number, y: number): Room | undefined {
+    const [cx, , cz] = this.cell(x, y);
+    const m = this.mover;
+    const dx = m.x - cx;
+    const dz = m.z - cz;
+    const d = Math.hypot(dx, dz);
+    const t = clamp01((1 - d) / 0.4);
+    const k = t * t * (3 - 2 * t);
+    const i = x + y * this.state.width;
+    if (k <= 0) {
+      this.away.delete(i);
+      return undefined;
+    }
+    let away = this.away.get(i);
+    if (!away) {
+      // Came in from a side: the items go to the other one. Already on the cell: to the back.
+      away = d < 0.05 ? [0, -1] : Math.abs(dx) > Math.abs(dz) ? [-Math.sign(dx), 0] : [0, -Math.sign(dz)];
+      this.away.set(i, away);
+    }
+    return { k, away };
+  }
+
+  /** The room of the cells around the character that have items to move, rounded (changes trigger a rebuild). */
+  private roomSignature(): string {
+    const s = this.state;
+    const [w, h] = [s.width, s.height];
+    const parts: string[] = [];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const items = s.cells[x + y * w]!.items;
+        let any = false;
+        for (const n in items) if ((items[n] ?? 0) > 0) any = true;
+        if (!any) continue;
+        const r = this.roomAt(x, y);
+        if (r) parts.push(`${x},${y}:${r.k.toFixed(3)}`);
+      }
+    }
+    return parts.join(' ');
   }
 
   /** The items the robot carries, small, above its head. */

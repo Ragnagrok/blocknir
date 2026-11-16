@@ -47,6 +47,11 @@ export interface ItemDef {
   floor?: boolean;
   /** Never drawn (state flags such as `lying` or `asleep`). */
   hidden?: boolean;
+  /**
+   * Keeps its place when the grid character stands on its cell (a hammock it lies in). Other
+   * standing items step aside to the cell's corners while the character is there.
+   */
+  stay?: boolean;
 }
 
 /** One kind of floor. */

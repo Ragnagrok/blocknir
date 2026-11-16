@@ -239,6 +239,29 @@ describe('cell layout', () => {
     expect(flipped).toEqual(many);
     expect(layoutCell([{ name: 'lamp', count: 0 }]).placements).toHaveLength(0);
   });
+
+  it('steps items aside to the corners while the character stands on the cell', () => {
+    const lamp = [{ name: 'lamp', count: 1, height: 1.3 }];
+    const center = layoutCell(lamp).placements[0]!;
+    expect([center.x, center.z]).toEqual([0, 0]);
+    // On the cell, come in from the front (the camera side): the lamp goes to the back corner.
+    const on = layoutCell(lamp, undefined, { k: 1, away: [0, -1] }).placements[0]!;
+    expect(on.z).toBeLessThan(-0.3);
+    expect(Math.abs(on.x)).toBeGreaterThan(0.3);
+    expect(on.scale).toBeLessThan(center.scale);
+    // Came in from the right: the lamp goes left.
+    expect(layoutCell(lamp, undefined, { k: 1, away: [-1, 0] }).placements[0]!.x).toBeLessThan(-0.3);
+    // Half way: half way.
+    const half = layoutCell(lamp, undefined, { k: 0.5, away: [0, -1] }).placements[0]!;
+    expect(half.z).toBeCloseTo(on.z / 2);
+    // Two items: both corners of the far side.
+    const two = layoutCell([{ name: 'a', count: 1 }, { name: 'b', count: 1 }], undefined, { k: 1, away: [0, 1] }).placements;
+    expect(two.every((p) => p.z > 0.3)).toBe(true);
+    expect(two[0]!.x).toBeCloseTo(-two[1]!.x);
+    // A hammock the character lies in stays put.
+    const hammock = layoutCell([{ name: 'hammock', count: 1, stay: true }], undefined, { k: 1, away: [0, -1] }).placements[0]!;
+    expect([hammock.x, hammock.z, hammock.scale]).toEqual([center.x, center.z, center.scale]);
+  });
 });
 
 describe('follow camera', () => {

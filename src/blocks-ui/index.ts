@@ -31,7 +31,7 @@ export {
   type SlotRef,
   type Spot,
 } from './model.js';
-export { GROUP_ORDER, hole, isHole, Schema, type BlockTemplate, type Creation, type Group, type Shape } from './schema.js';
+export { GROUP_ORDER, hole, isHole, paramSpecOf, Schema, type BlockTemplate, type Creation, type Group, type Shape } from './schema.js';
 export { parseTemplate, type Segment } from './template.js';
-export { DEFAULT_TEXT, mergeText, type UiText } from './text.js';
+export { DEFAULT_TEXT, mergeText, paramTypeName, type UiText } from './text.js';
 export { CSS as BLOCK_EDITOR_CSS, injectStyles } from './styles.js';

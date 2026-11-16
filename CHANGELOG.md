@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.2
+
+Objects that make room for the robot, and procedures whose parameters say what goes in them.
+
+- **blocks-3d**: items make room for the grid character. While it stands on a cell (or walks in),
+  the standing items slide to the cell's corners, away from the side it came in from, and a bit
+  smaller, so a tall lamp no longer stands inside the robot; they slide back when it leaves. Picks
+  and drops fly from and to where the item really stands. `ItemDef.stay` keeps an item in place
+  (a hammock the character lies in). `layoutCell(entries, maxCopies, room)`, `asideSlots`, `Room`.
+- **blocks**: typed procedure parameters. `Procedure.types` (optional, parallel to `params`) says
+  what each one takes, like a command's slots (`{ type: 'direction' }`, `{ type: 'name', name:
+  'item' }`). A call with a value of another type stops with `argType`.
+- **blocks-ui**: adding a parameter asks what goes in it, among the types the level's blocks use
+  (`Schema.paramTypes()`: a number, a direction, an item, a color…, true or false when there are
+  conditions); its menu can change it (`EditorModel.setParamType`). The call's slot starts with a
+  value of that type and offers that type's values; the parameter fits only where that type goes,
+  and its chip shows the type (`hacia · dirección`). `addParam(id, name, type?)`, `paramSpecOf`,
+  `paramTypeName`, `Schema.program`, `Schema.callArg`; texts `paramTypeMenu`, `paramTypeTitle`,
+  `paramTypes`. Programs without `types` work as before.
+
 ## 0.3.1
 
 What the kids' book asked for on phones, in quizzes and in playback.
