@@ -29,6 +29,10 @@ fijas.
 
 ## Probarlo
 
+Online, sin instalar nada: **<https://engine.ragnagrok.com>** (el editor y los ejemplos).
+
+O en tu máquina:
+
 ```sh
 git clone https://github.com/Ragnagrok/ragnagrok-engine.git
 cd ragnagrok-engine

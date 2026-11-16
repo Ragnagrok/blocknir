@@ -25,6 +25,10 @@ top-down adventure about learning to program, and a fixed-camera voxel survival-
 
 ## Try it
 
+Online, without installing anything: **<https://engine.ragnagrok.com>** (the editor and the examples).
+
+Or locally:
+
 ```sh
 git clone https://github.com/Ragnagrok/ragnagrok-engine.git
 cd ragnagrok-engine
