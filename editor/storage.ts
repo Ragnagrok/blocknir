@@ -42,6 +42,8 @@ export function projectJson(p: Project): string {
  * dev server without `PROJECT`). `null`: the API is there but its file does not exist yet.
  */
 export async function loadFromDisk(): Promise<Project | null | undefined> {
+  // The project API only exists on the dev server; a built site doesn't ask (and logs no 404).
+  if (!import.meta.env.DEV) return undefined;
   let r: Response;
   try {
     r = await fetch(API, { cache: 'no-store' });
