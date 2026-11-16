@@ -4,8 +4,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { blocks } from './build.js';
-import { check, type GridLevel, type RealtimeLevel, type TurtleLevel } from './level.js';
-import { countBlocks } from './toolbox.js';
+import { check, palette, type GridLevel, type RealtimeLevel, type TurtleLevel } from './level.js';
+import { allows, countBlocks } from './toolbox.js';
 import type { Program } from './ast.js';
 
 describe('chapter 1: sequence, commands, procedures', () => {
@@ -387,6 +387,42 @@ describe('chapter 5: parameters and the turtle', () => {
     const r = check(level, square);
     expect(r.cases.map((c) => c.passed)).toEqual([true, false, false]);
     expect(r.cases[1]!.reason).toBe('El dibujo tiene 4 líneas, y tenía que tener 6.');
+  });
+
+  it('a ready-made 360 ÷ ( ) reporter: the 360 is fixed, the divisor is open', () => {
+    const h = blocks('h');
+    const level: TurtleLevel = {
+      id: 'ch5-any-polygon',
+      world: 'turtle',
+      goal: { type: 'shape', target: { polygon: { sides: 5, side: 40 } } },
+      variants: [{ main: [h.call('polygon', 5, 40)] }, { main: [h.call('polygon', 7, 30)], goal: { type: 'shape', target: { polygon: { sides: 7, side: 30 } } } }],
+      toolbox: { commands: ['forward', 'turnRight'], control: ['repeat'], procedures: true, parameters: true, operators: [{ op: '/', args: [360, null] }] },
+    };
+    const entry = palette(level).find((e) => e.key === '/')!;
+    expect(entry).toMatchObject({ category: 'operator', label: '360 ÷ {1}', args: [360, null], returns: 'number' });
+    const b = blocks();
+    const good = b.program([], [b.proc('polygon', ['sides', 'side'], b.repeat(b.param('sides'), b.cmd('forward', b.param('side')), b.cmd('turnRight', b.arith('/', 360, b.param('sides')))))]);
+    expect(check(level, good).passed).toBe(true);
+    // Another dividend is not the offered block.
+    const other = b.program([], [b.proc('polygon', ['sides', 'side'], b.repeat(b.param('sides'), b.cmd('forward', b.param('side')), b.cmd('turnRight', b.arith('/', 720, b.param('sides')))))]);
+    const r = check(level, other);
+    expect(r.passed).toBe(false);
+    expect(r.issues.map((i) => i.code)).toContain('notAllowed');
+    expect(allows(level.toolbox, b.arith('/', 360, 7))).toBe(true);
+    expect(allows(level.toolbox, b.arith('*', 360, 7))).toBe(false);
+    // With the plain operator offered too, any division is fine.
+    expect(allows({ ...level.toolbox, operators: [{ op: '/', args: [360, null] }, '/'] }, b.arith('/', 720, 7))).toBe(true);
+  });
+
+  it('presets without a label write their fixed values into the block label', () => {
+    const level: GridLevel = {
+      id: 'ch5-preset-labels',
+      world: 'grid',
+      board: { width: 3, height: 1, robot: { x: 0, y: 0 } },
+      goal: { type: 'robotAt', x: 2 },
+      toolbox: { commands: [{ name: 'move', args: ['E'] }, { name: 'move', args: ['N'], label: 'Subir' }], operators: [{ op: '=', args: [null, 3] }, { op: 'not', label: 'no {0}' }] },
+    };
+    expect(palette(level).map((e) => e.label)).toEqual(['Mover →', 'Subir', '{0} = 3', 'no {0}']);
   });
 });
 

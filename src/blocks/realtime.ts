@@ -17,9 +17,11 @@
  *     won if `win` holds (and `lose` does not), lost otherwise.
  * Bumping into walls or the edge is not an error here: the actor just stays (a `bumped` event).
  *
- * Two kinds of questions about touches: `touching(kind)` is true while sharing a cell; `touched(kind)`
- * answers yes once per new contact (it is "used up"), so a loop that adds points never counts one
- * touch twice. `signal(name)` / `received(name)` work the same way between actors ("a cloud reached
+ * Two kinds of questions about touches: `touching(kind)` asks "am I touching one now?": it is true
+ * while sharing a cell, every time it is asked, and is never used up (good for `Repetir hasta que`
+ * and for conditions checked twice). `touched(kind)` answers yes once per new contact (it is "used
+ * up" by the first question of that actor), so a loop that adds points never counts one touch
+ * twice; it also catches actors that swapped cells and never shared one. `signal(name)` / `received(name)` work the same way between actors ("a cloud reached
  * the lighthouse"): every signal is answered yes once by each actor that asks.
  */
 import type { Handler, Program, Statement } from './ast.js';

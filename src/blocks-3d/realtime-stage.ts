@@ -50,6 +50,7 @@ export class RealtimeStage implements Stage {
   interval = 1 / 6;
 
   private floor: Floor;
+  private readonly floorOf: () => Floor;
   private props: InstancedTemplate[] = [];
   private actors = new Map<string, Live>();
   private age = 0;
@@ -78,16 +79,18 @@ export class RealtimeStage implements Stage {
       list.push(place(cx, 0, cz));
       props.set(name, list);
     }
-    this.floor = buildFloor(
-      ctx.assets,
-      width,
-      height,
-      (x, y) => {
-        const t = tiles.get(`${x},${y}`);
-        return t && isTerrain(t) ? t : null;
-      },
-      (x, y) => walls.has(`${x},${y}`),
-    );
+    this.floorOf = () =>
+      buildFloor(
+        ctx.assets,
+        width,
+        height,
+        (x, y) => {
+          const t = tiles.get(`${x},${y}`);
+          return t && isTerrain(t) ? t : null;
+        },
+        (x, y) => walls.has(`${x},${y}`),
+      );
+    this.floor = this.floorOf();
     this.root.add(this.floor.group);
     for (const [name, list] of props) {
       const it = new InstancedTemplate(ctx.assets.item(name).object);
@@ -101,6 +104,18 @@ export class RealtimeStage implements Stage {
   private cell(x: number, y: number, out = new THREE.Vector3()): THREE.Vector3 {
     const [cx, cz] = cellCenter(x, y, this.setup.arena.width, this.setup.arena.height);
     return out.set(cx, Math.max(0, this.floor.level(x, y)), cz);
+  }
+
+  rebuildFloor(): void {
+    this.floor.dispose();
+    this.floor.group.removeFromParent();
+    this.floor = this.floorOf();
+    this.root.add(this.floor.group);
+  }
+
+  focus(): [number, number, number] | null {
+    const p = this.actors.get('player');
+    return p ? [p.mover.x, p.mover.y, p.mover.z] : null;
   }
 
   bounds(): Bounds {

@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { poseOf, type Figure, type Model, type Project } from '../core/index.js';
 import { emissiveMaterial, Figure3D, solidMaterial, VoxelMesh } from '../render/index.js';
-import type { CharacterVisual } from './skin.js';
+import type { CharacterVisual, PoseInfo } from './skin.js';
 
 export const easeInOut = (t: number): number => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 export const easeOut = (t: number): number => 1 - (1 - t) ** 3;
@@ -333,9 +333,14 @@ const CLIP_FALLBACKS: Record<string, string[]> = {
 
 /**
  * A rigged figure as a character. `scale` sizes the whole figure; `height` is its standing height
- * in meters after scaling.
+ * in meters after scaling. For level actions (`pose('action', t, { action: 'eatApple' })`) it plays
+ * `actions[name]`, else a clip named like the action, else the `action` clip and its fallbacks.
  */
-export function figureCharacter(project: Project, figure: Figure, options: { scale?: number; height: number; extra?: (clip: string, t: number, f: Figure3D) => void }): CharacterVisual & { figure: Figure3D } {
+export function figureCharacter(
+  project: Project,
+  figure: Figure,
+  options: { scale?: number; height: number; actions?: Record<string, string>; extra?: (clip: string, t: number, f: Figure3D, info?: PoseInfo) => void },
+): CharacterVisual & { figure: Figure3D } {
   const f = new Figure3D(project, figure, { light: false });
   f.scale.setScalar(options.scale ?? 1);
   // Movers set the holder's scale (pop-ins, vanishing); the figure keeps its own.
@@ -347,14 +352,17 @@ export function figureCharacter(project: Project, figure: Figure, options: { sca
     if (o instanceof THREE.Mesh && o.material === emissiveMaterial) o.material = softGlowMaterial;
   });
   const names = new Set(figure.clips.map((c) => c.name));
-  const pick = (clip: string): string => (CLIP_FALLBACKS[clip] ?? [clip, 'idle']).find((c) => names.has(c)) ?? 'idle';
+  const pick = (clip: string, info?: PoseInfo): string => {
+    const action = clip === 'action' && info?.action ? [options.actions?.[info.action], info.action] : [];
+    return [...action, ...(CLIP_FALLBACKS[clip] ?? [clip, 'idle'])].find((c): c is string => !!c && names.has(c)) ?? 'idle';
+  };
   return {
     figure: f,
     object: holder,
     height: options.height,
-    pose(clip, t) {
-      f.applyPose(poseOf(figure, pick(clip), t));
-      options.extra?.(clip, t, f);
+    pose(clip, t, info) {
+      f.applyPose(poseOf(figure, pick(clip, info), t));
+      options.extra?.(clip, t, f, info);
     },
     dispose: () => disposeObject(holder),
   };

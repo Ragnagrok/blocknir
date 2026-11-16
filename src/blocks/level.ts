@@ -8,9 +8,9 @@ import { evaluateGridGoal, GRID_GOAL_LABELS, type GoalResult, type GridGoal } fr
 import { checkRequirement, REQUIREMENT_LABELS, type Requirement } from './requirements.js';
 import { actionLabels, GRID_LABELS, GRID_SENSORS, gridCommands, runGrid, type CustomAction, type GridBoard, type GridRun } from './grid.js';
 import { plainLabel, type BlockSpec, type ParamSpec } from './interpreter.js';
-import { DEFAULT_LABELS, formatMessage, mergeLabels, type LabelOverrides, type Labels } from './labels.js';
+import { DEFAULT_LABELS, describeValue, formatMessage, mergeLabels, type LabelOverrides, type Labels } from './labels.js';
 import { REALTIME_COMMANDS, REALTIME_LABELS, REALTIME_SENSORS, runRealtime, type GameStatus, type RealtimeRun, type RealtimeSetup } from './realtime.js';
-import { analyze, countBlocks, entryName, type Catalog, type Issue, type Toolbox, type ToolboxEntry } from './toolbox.js';
+import { analyze, countBlocks, entryName, operatorName, type Catalog, type Issue, type OperatorBlock, type PresetArg, type Toolbox, type ToolboxEntry } from './toolbox.js';
 import { evaluateTurtleGoal, runTurtle, TURTLE_COMMANDS, TURTLE_LABELS, TURTLE_SENSORS, type TurtleGoal, type TurtleRun, type TurtleStart } from './turtle.js';
 import type { Value, ValueType } from './values.js';
 import { generateBoards, resolveBoard, type BoardGenerator } from './variants.js';
@@ -309,8 +309,22 @@ export interface PaletteEntry {
   params: ParamSpec[];
   /** Reporters: what they give. */
   returns?: ValueType;
-  /** Preset blocks (`Mover ↑`, `¿Hay manzana?`): the fixed arguments for the slots. */
-  args?: Value[];
+  /**
+   * Preset blocks (`Mover ↑`, `¿Hay manzana?`, `360 ÷ ( )`): the fixed argument of each slot, or
+   * `null` for a slot left open. `label` then shows only the open slots (`360 ÷ {1}`).
+   */
+  args?: PresetArg[];
+}
+
+/**
+ * The label of a preset: the block's template with each fixed slot written as its value
+ * (`{0} ÷ {1}` with `[360, null]` is `360 ÷ {1}`). Open slots keep their `{i}`.
+ */
+export function presetLabel(template: string, args: readonly PresetArg[], labels: Labels): string {
+  return template.replace(/\{(\d+)\}/g, (all, i: string) => {
+    const v = args[Number(i)];
+    return v === undefined || v === null ? all : describeValue(v, labels);
+  });
 }
 
 /** The blocks a level's toolbox offers, in a stable order, with their labels and slot types. */
@@ -324,17 +338,18 @@ export function palette(level: Level, base: Labels = DEFAULT_LABELS): PaletteEnt
     if (spec.returns) e.returns = spec.returns;
     out.push(e);
   };
+  const preset = (e: PaletteEntry, args: PresetArg[] | undefined, label: string | undefined): void => {
+    if (args) e.args = [...args];
+    if (label !== undefined) e.label = label;
+    else if (args) e.label = presetLabel(e.label, args, labels);
+  };
   const entries = (list: readonly ToolboxEntry[], category: PaletteCategory, specs: Readonly<Record<string, BlockSpec>>): void => {
     for (const e of list) {
       const name = entryName(e);
       const spec = specs[name];
       if (!spec) continue;
       add(name, category, spec);
-      if (typeof e !== 'string') {
-        const last = out[out.length - 1]!;
-        if (e.label !== undefined) last.label = e.label;
-        if (e.args) last.args = [...e.args];
-      }
+      if (typeof e !== 'string') preset(out[out.length - 1]!, e.args, e.label);
     }
   };
   entries(tb.commands, 'command', cat.commands);
@@ -344,13 +359,18 @@ export function palette(level: Level, base: Labels = DEFAULT_LABELS): PaletteEnt
   const any: ParamSpec = { type: 'any' };
   const d: ParamSpec = { type: 'direction' };
   for (const c of tb.control ?? []) add(c, 'control', { params: c === 'repeat' || c === 'wait' ? [n] : [b] });
+  const operatorSpec = (o: OperatorBlock): BlockSpec => {
+    if (o === 'and' || o === 'or') return { params: [b, b], returns: 'boolean' };
+    if (o === 'not') return { params: [b], returns: 'boolean' };
+    if (o === 'opposite' || o === 'left' || o === 'right') return { params: [d], returns: 'direction' };
+    if (o === '=' || o === '!=') return { params: [any, any], returns: 'boolean' };
+    if (o === '<' || o === '<=' || o === '>' || o === '>=') return { params: [n, n], returns: 'boolean' };
+    return { params: [n, n], returns: 'number' };
+  };
   for (const o of tb.operators ?? []) {
-    if (o === 'and' || o === 'or') add(o, 'operator', { params: [b, b], returns: 'boolean' });
-    else if (o === 'not') add(o, 'operator', { params: [b], returns: 'boolean' });
-    else if (o === 'opposite' || o === 'left' || o === 'right') add(o, 'operator', { params: [d], returns: 'direction' });
-    else if (o === '=' || o === '!=') add(o, 'operator', { params: [any, any], returns: 'boolean' });
-    else if (o === '<' || o === '<=' || o === '>' || o === '>=') add(o, 'operator', { params: [n, n], returns: 'boolean' });
-    else add(o, 'operator', { params: [n, n], returns: 'number' });
+    const op = operatorName(o);
+    add(op, 'operator', operatorSpec(op));
+    if (typeof o !== 'string') preset(out[out.length - 1]!, o.args, o.label);
   }
   if (tb.variables) {
     add('set', 'variable', { params: [any] });

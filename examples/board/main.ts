@@ -113,6 +113,25 @@ const scene: GridLevel = {
 };
 const sceneProgram = b.program([b.cmd('goPc'), b.cmd('turnOnPc'), b.cmd('writeA'), b.cmd('goHammock'), b.cmd('lieDown')]);
 
+// A creek of stones: a 30 × 1 row, too long to show whole at a readable size, so the camera
+// follows Bolo (on a phone `auto` would do it too; `meta.camera` asks for it everywhere).
+const creek: GridLevel = {
+  id: 'arroyo',
+  world: 'grid',
+  title: 'El arroyo de piedras',
+  board: boardFromRows([`R${'sw'.repeat(14)}F`], {
+    R: { terrain: 'start', robot: 'E' },
+    s: { terrain: 'rock' },
+    w: { terrain: 'water' },
+    F: { terrain: 'goal', items: { flag: 1 } },
+  }),
+  actions: [{ name: 'jumpStone', label: 'Saltar piedra', move: 'E' }],
+  goal: { type: 'robotAt', onItem: 'flag' },
+  toolbox: { commands: ['jumpStone', 'say'], control: ['repeat'] },
+  meta: { camera: 'follow' },
+};
+const creekProgram = b.program([b.repeat(29, b.cmd('jumpStone')), b.cmd('say', '¡Crucé!')]);
+
 const polygon: TurtleLevel = {
   id: 'pentagono',
   world: 'turtle',
@@ -178,6 +197,7 @@ const SAMPLES: Sample[] = [
   { name: 'Faroles', level: lamps, program: lampsProgram },
   { name: 'Manzanas', level: apples, program: applesProgram },
   { name: 'Escena', level: scene, program: sceneProgram },
+  { name: 'Arroyo', level: creek, program: creekProgram },
   { name: 'Tortuga', level: polygon, program: polygonProgram },
   { name: 'Cocos', level: dodge, program: dodgeProgram },
 ];

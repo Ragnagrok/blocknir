@@ -125,6 +125,7 @@ export const DEFAULT_TEXT: UiText = {
     duplicateName: 'Ya hay uno con ese nombre.',
     name: 'Falta el nombre.',
     edge: 'No se puede mover más.',
+    fixed: 'Esa parte del bloque viene fija.',
     readOnly: 'Esperá a que termine.',
     notFound: 'No se pudo.',
     invalid: 'No se pudo.',

@@ -146,3 +146,65 @@ export function boardBounds(width: number, height: number, options: { rim?: numb
   const top = options.top ?? 1.25;
   return { min: [-width / 2 - rim, -0.4, -height / 2 - rim], max: [width / 2 + rim, top, height / 2 + rim] };
 }
+
+/** Screen pixels per meter at a camera distance, for a viewport `viewportHeight` pixels tall. */
+export function pixelsPerMeter(distance: number, fov: number, viewportHeight: number): number {
+  return viewportHeight / (2 * Math.tan((fov * DEG) / 2) * Math.max(1e-6, distance));
+}
+
+/**
+ * The camera distance at which one meter (one cell) measures `px` pixels on screen.
+ * The inverse of `pixelsPerMeter`.
+ */
+export function distanceForPixels(px: number, fov: number, viewportHeight: number): number {
+  return viewportHeight / (2 * Math.tan((fov * DEG) / 2) * Math.max(1e-6, px));
+}
+
+export interface FollowOptions extends FramingOptions {
+  /** Viewport height in pixels. */
+  viewportHeight: number;
+  /** How big a 1 m cell should look, in pixels. */
+  cellPx: number;
+  /** The framing of the whole box (computed if missing). The follow view is never farther. */
+  full?: Framing;
+}
+
+/**
+ * A closer view that keeps `focus` (the character) near the middle of the screen at a comfortable
+ * zoom (`cellPx` pixels per meter), with the same pitch as the full framing. The target is clamped
+ * so the view does not leave the box: along an axis where the box is smaller than the view, the box
+ * stays centered; where it is larger, the view slides over it and stops at its edges. When the
+ * whole box already fits at that zoom, this is the full framing.
+ */
+export function followBox(box: Bounds, focus: Vec3, o: FollowOptions): Framing {
+  const full = o.full ?? frameBox(box, o);
+  const d = Math.min(full.distance, distanceForPixels(o.cellPx, o.fov, o.viewportHeight));
+  if (d >= full.distance * 0.999) return full;
+  const pitch = full.pitch;
+  const half = (o.fov * DEG) / 2;
+  const p = pitch * DEG;
+  // The camera looks a bit above the floor (at the character's middle); the view is measured on the floor.
+  const floor = focus[1];
+  const y = Math.max(box.min[1], Math.min(box.max[1], floor + 0.35));
+  const lift = y - floor;
+  const height = lift + d * Math.sin(p);
+  const back = d * Math.cos(p);
+  // How far the floor reaches toward the bottom (near) and the top (far) of the screen from the
+  // point under the target.
+  const near = back - height / Math.tan(p + half);
+  const far = p - half > 0.01 ? height / Math.tan(p - half) - back : Infinity;
+  const slide = (want: number, lo: number, hi: number): number => (lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, want)));
+  // Screen up is −z: the far edge of the view must not pass the box's far side, nor the near edge its near side.
+  // A board shallower than the view keeps its middle row in the middle of the screen.
+  const zLo = box.min[2] + far;
+  const zHi = box.max[2] - near;
+  const z = zLo > zHi ? (box.min[2] + box.max[2]) / 2 + lift / Math.tan(p) : Math.min(zHi, Math.max(zLo, focus[2]));
+  // The floor seen is a trapezoid: measure its half width across the middle of the visible board.
+  const rows = (Math.max(box.min[2], z - far) + Math.min(box.max[2], z + near)) / 2;
+  const depth = (z + back - rows) * Math.cos(p) + height * Math.sin(p);
+  const hx = depth * Math.tan(half) * o.aspect;
+  const x = slide(focus[0], box.min[0] + hx, box.max[0] - hx);
+  const target: Vec3 = [x, y, z];
+  const { forward } = cameraAxes(pitch);
+  return { position: [x - forward[0] * d, y - forward[1] * d, z - forward[2] * d], target, pitch, distance: d };
+}

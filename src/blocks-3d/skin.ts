@@ -5,6 +5,7 @@
  */
 import type * as THREE from 'three';
 import { Box3 } from 'three';
+import type { Value } from '../blocks/index.js';
 import type { Figure, Project } from '../core/index.js';
 import { figureCharacter, isCharacter, propCharacter } from './pieces.js';
 
@@ -63,14 +64,29 @@ export interface TerrainDef {
 /** Clip names the view asks characters for; a character falls back to `idle` for the ones it lacks. */
 export type CharacterClip = 'idle' | 'walk' | 'jump' | 'pick' | 'drop' | 'light' | 'paint' | 'action' | 'talk' | 'cheer' | 'sad' | 'bump';
 
+/**
+ * What a clip is for, beyond its name. For a level action (`eatApple`, `sing`, `kick`), the view
+ * plays the generic `action` clip with `{ action: 'eatApple', args }`, so a character can play its
+ * own animation for that action and fall back to `action` for the rest.
+ */
+export interface PoseInfo {
+  /** The level action being performed (`CustomAction.name`), when `clip` is `action`. */
+  action?: string;
+  /** The action's arguments. */
+  args?: readonly Value[];
+}
+
 /** An animated character: the robot, the turtle, the player and other actors. */
 export interface CharacterVisual {
   /** Feet on y = 0, facing +z. */
   object: THREE.Object3D;
   /** Meters, for placing speech bubbles and what it carries. */
   height: number;
-  /** Poses it: `clip` at `t` seconds. */
-  pose(clip: CharacterClip | string, t: number): void;
+  /**
+   * Poses it: `clip` at `t` seconds. `info.action` names the level action when `clip` is `action`
+   * (see `PoseInfo`); characters that ignore it simply play `action`.
+   */
+  pose(clip: CharacterClip | string, t: number, info?: PoseInfo): void;
   /** Turtle: lowers or raises the chalk, in this color. */
   setPen?(down: boolean, color: number): void;
   /** Turtle: meters in front of the origin where the chalk touches the floor. Default 0. */
@@ -107,10 +123,48 @@ export interface Environment {
   sand: number;
   sun: { color: number; intensity: number };
   ambient: { sky: number; ground: number; intensity: number };
-  /** Props scattered on the beach around the board (palms, rocks). */
+  /**
+   * Props scattered on the beach around the board (palms, rocks). **The order matters**: entries
+   * 0 and 1 are placed only behind the board (along its far edge, the top of the screen), so they
+   * may be tall (palms, trees); entries 2 and 3 are placed all around it, in front and at the sides
+   * too, so they must be low (shells, pebbles, flowers) or they hide cells. Entries after the fourth
+   * are not used. With fewer than four, indexes wrap around (`i % length`), so a list of one or two
+   * puts those props in front as well: repeat a low prop to fill four slots, or pass `[]` for no
+   * decor. The default is `[palm, bush, shells, boulder]`.
+   */
   decor?: Array<() => THREE.Object3D>;
+  /**
+   * One-off scenery around the board, placed once rather than scattered like `decor`: a moon and
+   * its golden path on the sea, star glints, a distant island. The view builds it once per
+   * environment and board size (again after `setEnvironment` or when a world of another size is
+   * shown, disposing the old one) and adds it in world space. **Its origin** is the middle of the
+   * board's far edge (the top of the screen) at sea level; +x is to the right, −z goes away from
+   * the camera (behind the board), +y up, 1 unit = 1 cell. It is not scaled: use `board.width`
+   * and `board.depth` (meters, rim included) to spread it, since a 30 × 1 row is much wider than
+   * a 5 × 5 board, and the follow camera pans along the board's width. The camera looks down at
+   * 50–66°, so the sky itself is never on screen: "sky" things belong on the sea behind the board,
+   * within a few meters of it. Shadows are off unless the objects turn them on.
+   */
+  backdrop?: (board: BackdropContext) => THREE.Object3D;
 }
 
+/** What a backdrop knows about the board it surrounds. */
+export interface BackdropContext {
+  /** Width of the board (x), in meters, rim included. */
+  width: number;
+  /** Depth of the board (z), in meters, rim included. */
+  depth: number;
+  world: 'grid' | 'turtle' | 'realtime';
+}
+
+/**
+ * How a game looks: tables from names to visuals (`items`, `terrain`, `characters`, `actors`,
+ * `colors`, `aliases`) plus the `environment` (sky, sea, sand, light, decor; see
+ * `Environment.decor` for which decor goes behind the board and which in front). Build one with
+ * `extendSkin(defaultSkin, { … })`: entries are merged by name, `null` removes a name, and
+ * `replace: ['items']` drops a whole default table. `BoardView.setEnvironment` swaps the
+ * environment live.
+ */
 export interface Skin {
   name: string;
   items: Record<string, ItemDef>;
@@ -139,6 +193,9 @@ export interface Skin {
   environment: Environment;
 }
 
+/** The name tables of a skin, which `mergeSkin` and `extendSkin` merge by name unless told to replace them. */
+export type SkinTable = 'items' | 'aliases' | 'terrain' | 'characters' | 'actors' | 'colors';
+
 /** A partial skin to lay over another one with `mergeSkin` (strict entries; see `extendSkin` for shorthands). */
 export type SkinOverrides = Partial<Omit<Skin, 'items' | 'aliases' | 'terrain' | 'characters' | 'actors' | 'colors' | 'character' | 'environment'>> & {
   items?: Record<string, ItemDef>;
@@ -149,19 +206,29 @@ export type SkinOverrides = Partial<Omit<Skin, 'items' | 'aliases' | 'terrain' |
   colors?: Record<string, number>;
   character?: Partial<Skin['character']>;
   environment?: Partial<Environment>;
+  /**
+   * Tables that replace the base's instead of being merged into it: `['items']` keeps none of the
+   * base items (names without an entry then get the fallback marker). Replacing `terrain` needs
+   * entries for `defaultTerrain`, `wallTerrain` and `patioTerrain`; replacing `characters`, the
+   * ones `character` names.
+   */
+  replace?: readonly SkinTable[];
 };
 
 /** A skin with some entries replaced or added: `mergeSkin(defaultSkin(), { items: { apple: myApple } })`. */
 export function mergeSkin(base: Skin, over: SkinOverrides): Skin {
+  const { replace = [], ...rest } = over;
+  const table = <T>(name: SkinTable, b: Record<string, T> | undefined, o: Record<string, T> | undefined): Record<string, T> =>
+    replace.includes(name) ? { ...o } : { ...b, ...o };
   return {
     ...base,
-    ...over,
-    items: { ...base.items, ...over.items },
-    aliases: { ...base.aliases, ...over.aliases },
-    terrain: { ...base.terrain, ...over.terrain },
-    characters: { ...base.characters, ...over.characters },
-    actors: { ...base.actors, ...over.actors },
-    colors: { ...base.colors, ...over.colors },
+    ...rest,
+    items: table('items', base.items, over.items),
+    aliases: table('aliases', base.aliases, over.aliases),
+    terrain: table('terrain', base.terrain, over.terrain),
+    characters: table('characters', base.characters, over.characters),
+    actors: table('actors', base.actors, over.actors),
+    colors: table('colors', base.colors, over.colors),
     character: { ...base.character, ...over.character },
     environment: { ...base.environment, ...over.environment },
   };
@@ -322,6 +389,11 @@ export interface FigureSpec {
   scale?: number;
   /** Standing height in meters after scaling (for bubbles). Default 1. */
   height?: number;
+  /**
+   * Clips for level actions: `{ eatApple: 'eat', sing: 'sing' }`. Without an entry, a clip named
+   * like the action is used if the figure has one, and `action` otherwise.
+   */
+  actions?: Record<string, string>;
 }
 
 /** A character: a full factory, a factory of a plain object (it bobs and squashes), or a figure. */
@@ -333,12 +405,18 @@ export type ActorLike = ActorDef | ((ctx: ActorContext) => THREE.Object3D | Char
 /** A terrain: a full definition, or a tile factory. */
 export type TerrainLike = TerrainDef | ((shade: 0 | 1) => THREE.Object3D);
 
-/** What `extendSkin` takes: like `SkinOverrides`, with shorthands for every entry. */
-export type SkinExtension = Omit<SkinOverrides, 'items' | 'characters' | 'actors' | 'terrain'> & {
-  items?: Record<string, ItemLike>;
-  characters?: Record<string, CharacterLike>;
-  actors?: Record<string, ActorLike>;
-  terrain?: Record<string, TerrainLike>;
+/**
+ * What `extendSkin` takes: like `SkinOverrides`, with shorthands for every entry. An entry set to
+ * `null` removes that name from the base (`items: { palm: null }`); `replace: ['items']` drops the
+ * whole base table.
+ */
+export type SkinExtension = Omit<SkinOverrides, 'items' | 'characters' | 'actors' | 'terrain' | 'aliases' | 'colors'> & {
+  items?: Record<string, ItemLike | null>;
+  characters?: Record<string, CharacterLike | null>;
+  actors?: Record<string, ActorLike | null>;
+  terrain?: Record<string, TerrainLike | null>;
+  aliases?: Record<string, string | null>;
+  colors?: Record<string, number | null>;
 };
 
 /** The full definition of an item shorthand. */
@@ -357,7 +435,7 @@ export function toCharacterFactory(v: CharacterLike): CharacterFactory {
     return () => {
       const figure = typeof spec.figure === 'string' ? spec.project.figures.find((f) => f.id === spec.figure) : spec.figure;
       if (!figure) throw new Error(`No figure ${String(spec.figure)} in project ${spec.project.name}`);
-      return figureCharacter(spec.project, figure, { scale: spec.scale ?? 1, height: spec.height ?? 1 });
+      return figureCharacter(spec.project, figure, { scale: spec.scale ?? 1, height: spec.height ?? 1, ...(spec.actions ? { actions: spec.actions } : {}) });
     };
   }
   return (ctx) => {
@@ -368,32 +446,56 @@ export function toCharacterFactory(v: CharacterLike): CharacterFactory {
   };
 }
 
-const mapValues = <A, B>(r: Record<string, A> | undefined, f: (a: A) => B): Record<string, B> | undefined =>
-  r ? Object.fromEntries(Object.entries(r).map(([k, v]) => [k, f(v)])) : undefined;
+/** Splits a table of an extension into the entries to set (converted) and the names to remove. */
+function split<A, B>(r: Record<string, A | null> | undefined, f: (a: A) => B): { set: Record<string, B> | undefined; remove: string[] } {
+  if (!r) return { set: undefined, remove: [] };
+  const set: Record<string, B> = {};
+  const remove: string[] = [];
+  for (const [k, v] of Object.entries(r)) {
+    if (v === null) remove.push(k);
+    else set[k] = f(v);
+  }
+  return { set, remove };
+}
+
+const same = <A>(a: A): A => a;
 
 /**
- * A skin with some entries replaced or added, by name. Entries may be shorthands:
+ * A skin with some entries replaced, added or removed, by name. Entries may be shorthands:
  *
  * ```ts
  * const skin = extendSkin(defaultSkin, {
- *   items: { apple: () => myApple(), lamp: { create: myLamp, glow: { color: 0xffcc66, height: 0.9 } } },
- *   characters: { robot: { project, figure: 'bolo', scale: 0.5, height: 0.9 } },
+ *   items: { apple: () => myApple(), lamp: { create: myLamp, glow: { color: 0xffcc66, height: 0.9 } }, shell: null },
+ *   characters: { robot: { project, figure: 'bolo', scale: 0.5, height: 0.9, actions: { eatApple: 'eat' } } },
  *   actors: { gull: () => myGull() },
  *   aliases: { manzanita: 'apple' },
+ *   environment: { decor: [tallTree, bush, pebbles, flowers] },
+ *   replace: ['actors'],          // none of the default actors
  * });
  * ```
  */
 export function extendSkin(base: Skin | (() => Skin), ext: SkinExtension): Skin {
   const b = typeof base === 'function' ? base() : base;
-  const { items, characters, actors, terrain, ...rest } = ext;
+  const { items, characters, actors, terrain, aliases, colors, ...rest } = ext;
   const over: SkinOverrides = { ...rest };
-  const i = mapValues(items, toItemDef);
-  const c = mapValues(characters, toCharacterFactory);
-  const a = mapValues(actors, toActorDef);
-  const t = mapValues(terrain, toTerrainDef);
-  if (i) over.items = i;
-  if (c) over.characters = c;
-  if (a) over.actors = a;
-  if (t) over.terrain = t;
-  return mergeSkin(b, over);
+  const tables = {
+    items: split(items, toItemDef),
+    characters: split(characters, toCharacterFactory),
+    actors: split(actors, toActorDef),
+    terrain: split(terrain, toTerrainDef),
+    aliases: split(aliases, same),
+    colors: split(colors, same),
+  };
+  if (tables.items.set) over.items = tables.items.set;
+  if (tables.characters.set) over.characters = tables.characters.set;
+  if (tables.actors.set) over.actors = tables.actors.set;
+  if (tables.terrain.set) over.terrain = tables.terrain.set;
+  if (tables.aliases.set) over.aliases = tables.aliases.set;
+  if (tables.colors.set) over.colors = tables.colors.set;
+  const skin = mergeSkin(b, over);
+  for (const [name, t] of Object.entries(tables) as Array<[SkinTable, { remove: string[] }]>) {
+    const target = skin[name] as Record<string, unknown> | undefined;
+    if (target) for (const k of t.remove) delete target[k];
+  }
+  return skin;
 }

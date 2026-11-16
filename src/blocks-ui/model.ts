@@ -66,6 +66,8 @@ export type Refusal =
   | 'duplicateName'
   /** Already at the top or bottom. */
   | 'edge'
+  /** The slot is a fixed part of a preset block (the `360` of `360 ÷ ( )`). */
+  | 'fixed'
   | 'invalid';
 
 export type EditResult = { ok: true; id?: NodeId } | { ok: false; reason: Refusal };
@@ -673,6 +675,7 @@ export class EditorModel {
       const spec = this.schema.slots(parent)[slot.slot];
       const old = childExprs(parent)[slot.slot];
       if (!spec || !old) return no('notFound');
+      if (this.schema.isFixed(parent, slot.slot)) return no('fixed');
       if (typeof value === 'number' && !Number.isFinite(value)) return no('type');
       const keepId = old.kind === 'number' || old.kind === 'boolean' || old.kind === 'direction' || old.kind === 'name';
       const lit = this.schema.literal(keepId ? old.id : this.newIdFor(p), value, spec.type);
@@ -684,7 +687,11 @@ export class EditorModel {
 
   /** Empties a slot (its default value, or a hole). */
   clearSlot(slot: SlotRef): EditResult {
-    return this.edit('clear', slot.parent, (p) => (this.resetSlot(p, slot) ? OK : no('notFound')));
+    return this.edit('clear', slot.parent, (p) => {
+      const parent = nodeIndex(p).get(slot.parent);
+      if (parent && 'kind' in parent && this.schema.isFixed(parent, slot.slot)) return no('fixed');
+      return this.resetSlot(p, slot) ? OK : no('notFound');
+    });
   }
 
   /** Chooses the variable of a `set` / `change` block or a variable reporter. */
@@ -850,6 +857,7 @@ export class EditorModel {
     if (!parent || !('kind' in parent)) return no('notFound');
     const spec = this.schema.slots(parent)[slot.slot];
     if (!spec) return no('notFound');
+    if (this.schema.isFixed(parent, slot.slot)) return no('fixed');
     if (!this.schema.fits(this.schema.returns(expr), spec.type)) return no('type');
     if (!this.paramsInScope(expr, procedureOf(p, slot.parent))) return no('scope');
     setChild(parent, slot.slot, expr);
@@ -862,7 +870,9 @@ export class EditorModel {
     const spec = this.schema.slots(parent)[slot.slot];
     if (!spec) return false;
     const key = parent.kind === 'command' ? parent.command : parent.kind;
-    const e = spec.type === 'boolean' ? hole(this.newIdFor(p)) : this.schema.emptyExpr(this.newIdFor(p), spec, key);
+    // A preset's open slots go back to a hole, as they started.
+    const open = this.schema.presetOf(parent)?.args?.[slot.slot] === null;
+    const e = spec.type === 'boolean' || open ? hole(this.newIdFor(p)) : this.schema.emptyExpr(this.newIdFor(p), spec, key);
     return setChild(parent, slot.slot, e);
   }
 

@@ -119,11 +119,17 @@ export class View {
     this.composer.render();
   }
 
-  /** Frees the GPU resources of the renderer and the postprocessing passes. The scene is not touched. */
-  dispose(): void {
+  /**
+   * Frees the GPU resources of the renderer and the postprocessing passes, and releases the WebGL
+   * context (`forceContextLoss`), since browsers keep only a few contexts alive at once. The scene
+   * is not touched. The canvas's context stays lost: use a new canvas for a new view, or pass
+   * `{ loseContext: false }` to keep it.
+   */
+  dispose(options: { loseContext?: boolean } = {}): void {
     this.composer.dispose();
     this.bloom.dispose();
     this.finish.dispose();
     this.renderer.dispose();
+    if (options.loseContext !== false) this.renderer.forceContextLoss();
   }
 }

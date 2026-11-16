@@ -4,7 +4,7 @@ import type { Labels } from '../blocks/index.js';
 import { hash3 } from '../paint/index.js';
 import { decorSpots } from './models.js';
 import { disposeObject, InstancedTemplate, isCharacter, propCharacter } from './pieces.js';
-import { actorOf, glowOf, itemContext, terrainOf, type CharacterVisual, type ActorDef, type Glow, type ItemContext, type ItemDef, type Skin, type TerrainDef } from './skin.js';
+import { actorOf, glowOf, itemContext, terrainOf, type CharacterVisual, type ActorDef, type Environment, type Glow, type ItemContext, type ItemDef, type Skin, type TerrainDef } from './skin.js';
 
 export interface ItemAsset {
   ctx: ItemContext;
@@ -20,11 +20,27 @@ export interface ItemAsset {
 export class AssetCache {
   private items = new Map<string, ItemAsset>();
   private objects = new Map<string, THREE.Object3D | null>();
+  /** Sky, sea, sand, light and decor now (the skin's, until the view changes them). */
+  environment: Environment;
+  /** Whether floors get decor around them. */
+  showDecor = true;
 
   constructor(
     readonly skin: Skin,
     public labels: Labels | null,
-  ) {}
+  ) {
+    this.environment = skin.environment;
+  }
+
+  /** Changes the environment; decor objects are rebuilt on next use. */
+  setEnvironment(env: Environment): void {
+    this.environment = env;
+    for (const [k, o] of this.objects) {
+      if (!k.startsWith('decor:')) continue;
+      if (o) disposeObject(o);
+      this.objects.delete(k);
+    }
+  }
 
   /** The level's word for a name (`labels.names`), or the name. */
   label(name: string): string {
@@ -70,7 +86,7 @@ export class AssetCache {
   }
 
   decor(i: number): THREE.Object3D | null {
-    const list = this.skin.environment.decor ?? [];
+    const list = this.environment.decor ?? [];
     if (!list.length) return null;
     const k = ((i % list.length) + list.length) % list.length;
     return this.once(`decor:${k}`, () => list[k]!());
@@ -173,19 +189,20 @@ export function buildFloor(
   const rim = options.rim ?? 0.7;
   const sand = new THREE.Mesh(
     new THREE.BoxGeometry(width + rim * 2, 0.5, height + rim * 2),
-    new THREE.MeshStandardMaterial({ color: skin.environment.sand, roughness: 0.95 }),
+    new THREE.MeshStandardMaterial({ color: assets.environment.sand, roughness: 0.95 }),
   );
   sand.position.y = -0.36 - 0.25 + 0.12;
   sand.receiveShadow = true;
   group.add(sand);
   const wet = new THREE.Mesh(
     new THREE.BoxGeometry(width + rim * 2 + 0.6, 0.3, height + rim * 2 + 0.6),
-    new THREE.MeshStandardMaterial({ color: new THREE.Color(skin.environment.sand).multiplyScalar(0.86), roughness: 0.9 }),
+    new THREE.MeshStandardMaterial({ color: new THREE.Color(assets.environment.sand).multiplyScalar(0.86), roughness: 0.9 }),
   );
   wet.position.y = -0.62;
   wet.receiveShadow = true;
   group.add(wet);
-  if (options.decor !== false) {
+  if (options.decor !== false && assets.showDecor) {
+    // Decor order (see `Environment.decor`): entries 0 and 1 only behind the board, 2 and 3 anywhere.
     const kinds = new Map<number, THREE.Matrix4[]>();
     for (const s of decorSpots(width, height, rim)) {
       // Tall decor (palms) only at the back, so nothing hides the board.

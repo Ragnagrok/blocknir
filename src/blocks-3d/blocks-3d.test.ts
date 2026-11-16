@@ -2,10 +2,14 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { blocks, boardFromRows, runGrid, runTurtle, type GridEvent, type TraceStep } from '../blocks/index.js';
 import { defaultCatalogue, defaultSkin } from './default-skin.js';
-import { boardBounds, corners, frameBox, pitchFor, project, widen } from './framing.js';
+import type { Clip, Figure, Project } from '../core/index.js';
+import { boardBounds, corners, distanceForPixels, followBox, frameBox, pitchFor, pixelsPerMeter, project, widen, type Framing, type Vec3 } from './framing.js';
+import { cameraModeOf } from './board-view.js';
+import * as M from './models.js';
+import { figureCharacter } from './pieces.js';
 import { layoutCell } from './layout.js';
-import { actorOf, colorOf, extendSkin, itemContext, resolveName, terrainOf } from './skin.js';
-import { StepShow } from './stage.js';
+import { actorOf, colorOf, extendSkin, itemContext, mergeSkin, resolveName, terrainOf } from './skin.js';
+import { Mover, StepShow } from './stage.js';
 import { DEFAULT_TIMING, gridStepDuration, parseSpeed, Playhead, turtleStepDuration } from './timeline.js';
 
 const b = blocks();
@@ -234,5 +238,126 @@ describe('cell layout', () => {
     const flipped = layoutCell([{ name: 'apple', count: 3 }, { name: 'star', count: 12, pile: 'stack' }]);
     expect(flipped).toEqual(many);
     expect(layoutCell([{ name: 'lamp', count: 0 }]).placements).toHaveLength(0);
+  });
+});
+
+describe('follow camera', () => {
+  const fov = 36;
+  const phone = { w: 390, h: 844 };
+  const desk = { w: 1280, h: 800 };
+  const ndc = (p: Vec3, f: Framing, aspect: number): { x: number; y: number } => {
+    const q = project(p, f.position, f.pitch);
+    const t = Math.tan((fov * Math.PI) / 360);
+    return { x: q.x / (t * aspect), y: q.y / t };
+  };
+
+  it('a 30 × 1 row is too small to read whole on a phone, but not a 7 × 4 board', () => {
+    const aspect = phone.w / phone.h;
+    const row = frameBox(boardBounds(30, 1), { fov, aspect, margin: 0.03 });
+    expect(pixelsPerMeter(row.distance, fov, phone.h)).toBeLessThan(28);
+    const small = frameBox(boardBounds(7, 4), { fov, aspect, margin: 0.03 });
+    expect(pixelsPerMeter(small.distance, fov, phone.h)).toBeGreaterThan(28);
+    expect(distanceForPixels(pixelsPerMeter(12, fov, 800), fov, 800)).toBeCloseTo(12, 6);
+  });
+
+  it('follows the character along a 30 × 1 row, clamped to the ends, at the asked zoom', () => {
+    for (const vp of [phone, desk]) {
+      const aspect = vp.w / vp.h;
+      const box = boardBounds(30, 1);
+      const o = { fov, aspect, margin: 0.03, viewportHeight: vp.h, cellPx: 56 };
+      const at = (x: number): Framing => followBox(box, [x, 0, 0], o);
+      const start = at(-14.5);
+      expect(pixelsPerMeter(start.distance, fov, vp.h)).toBeCloseTo(56, 3);
+      // At the start the left end of the board touches the left edge of the screen, not beyond.
+      expect(ndc([box.min[0], 0, 0], start, aspect).x).toBeCloseTo(-1, 1);
+      // In the middle the character is in the middle of the screen.
+      const mid = at(0.5);
+      expect(Math.abs(ndc([0.5, 0.35, 0], mid, aspect).x)).toBeLessThan(0.02);
+      // At the end the right end touches the right edge.
+      const end = at(14.5);
+      expect(ndc([box.max[0], 0, 0], end, aspect).x).toBeCloseTo(1, 1);
+      // The single row stays centered vertically.
+      expect(start.target[2]).toBeCloseTo(mid.target[2], 6);
+      expect(Math.abs(ndc([0, 0, 0], mid, aspect).y)).toBeLessThan(0.15);
+    }
+  });
+
+  it('pans over both axes of a big maze and never shows past its far and near sides', () => {
+    const aspect = phone.w / phone.h;
+    const box = boardBounds(20, 20);
+    const o = { fov, aspect, margin: 0.03, viewportHeight: phone.h, cellPx: 56 };
+    const corner = followBox(box, [-9.5, 0, -9.5], o);
+    expect(ndc([corner.target[0], 0, box.min[2]], corner, aspect).y).toBeLessThanOrEqual(1.0001);
+    expect(ndc([corner.target[0], 0, box.min[2]], corner, aspect).y).toBeGreaterThan(0.9);
+    const other = followBox(box, [9.5, 0, 9.5], o);
+    expect(ndc([other.target[0], 0, box.max[2]], other, aspect).y).toBeGreaterThanOrEqual(-1.0001);
+    expect(ndc([other.target[0], 0, box.max[2]], other, aspect).y).toBeLessThan(-0.9);
+  });
+
+  it('is the full framing when the whole board already fits at that zoom', () => {
+    const aspect = desk.w / desk.h;
+    const box = boardBounds(5, 3);
+    const full = frameBox(box, { fov, aspect, margin: 0.03 });
+    expect(followBox(box, [2, 0, 1], { fov, aspect, margin: 0.03, viewportHeight: desk.h, cellPx: 56, full })).toBe(full);
+  });
+
+  it('reads the camera from level meta, in English or Spanish', () => {
+    expect(cameraModeOf({ camera: 'follow' })).toBe('follow');
+    expect(cameraModeOf({ camara: 'sigue' })).toBe('follow');
+    expect(cameraModeOf({ camara: 'fija' })).toBe('frame');
+    expect(cameraModeOf({ camera: 'frame', camara: 'sigue' })).toBe('frame');
+    expect(cameraModeOf({ camara: 'rara' })).toBeNull();
+    expect(cameraModeOf(undefined)).toBeNull();
+  });
+});
+
+describe('action clips', () => {
+  const apple = M.appleModel();
+  const clip = (name: string, x: number): Clip => ({ name, duration: 1, loop: true, keys: [{ t: 0, rot: { body: [x, 0, 0] } }] });
+  const figure = (clips: Clip[]): Figure => ({ id: 'f', name: 'f', parts: [{ id: 'body', model: apple.id, parent: null, pivot: [0, 0, 0], origin: [0, 0, 0] }], clips });
+  const project = (f: Figure): Project => ({ version: 1, name: 't', startScene: '', models: [apple], figures: [f], scenes: [] });
+  const angle = (v: ReturnType<typeof figureCharacter>): number => v.figure.joints.get('body')!.rotation.x;
+
+  it('a figure plays its own clip for a level action, and the generic action clip otherwise', () => {
+    const f = figure([clip('idle', 0), clip('action', 1), clip('chew', 2), clip('sing', 3)]);
+    const v = figureCharacter(project(f), f, { height: 1, actions: { eatApple: 'chew' } });
+    v.pose('action', 0, { action: 'eatApple' });
+    expect(angle(v)).toBeCloseTo(2);
+    v.pose('action', 0, { action: 'sing' });
+    expect(angle(v)).toBeCloseTo(3);
+    v.pose('action', 0, { action: 'kick' });
+    expect(angle(v)).toBeCloseTo(1);
+    v.pose('action', 0);
+    expect(angle(v)).toBeCloseTo(1);
+  });
+
+  it('the mover hands the action to the character while the clip lasts', () => {
+    const calls: Array<[string, string | undefined]> = [];
+    const m = new Mover({ object: new THREE.Group(), height: 1, pose: (c, _t, info) => calls.push([c, info?.action]) });
+    m.once('action', 0.5, 'idle', { action: 'wave' });
+    m.update(0.1);
+    m.update(0.5);
+    expect(calls).toEqual([
+      ['action', 'wave'],
+      ['idle', undefined],
+    ]);
+  });
+});
+
+describe('skin tables', () => {
+  it('extendSkin removes names with null and replaces whole tables', () => {
+    const mine = new THREE.Group();
+    const skin = extendSkin(defaultSkin, { items: { apple: null, rock: () => mine }, colors: { red: null }, replace: ['actors'], actors: { bird: () => new THREE.Group() } });
+    expect(itemContext(skin, 'apple').fallback).toBe(true);
+    expect(itemContext(skin, 'banana').fallback).toBe(false);
+    expect(Object.keys(skin.actors)).toEqual(['bird']);
+    expect(skin.colors.red).toBeUndefined();
+    expect(skin.colors.blue).toBe(defaultSkin().colors.blue);
+    expect('replace' in skin).toBe(false);
+    // The base skin is not changed.
+    const base = defaultSkin();
+    const only = mergeSkin(base, { items: {}, replace: ['items'] });
+    expect(Object.keys(only.items)).toEqual([]);
+    expect(Object.keys(base.items).length).toBeGreaterThan(5);
   });
 });

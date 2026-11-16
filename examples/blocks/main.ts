@@ -3,7 +3,7 @@
  * every case of the level, then plays one case (the first that fails, or the first one) step by
  * step, highlighting the running block, and shows the error bubble if the robot stops.
  */
-import { check, runCase, type GridLevel, type GridRun, type GridState, type Level, type RealtimeLevel, type RealtimeRun, type RealtimeState } from '../../src/blocks/index.js';
+import { check, runCase, type TurtleLevel, type GridLevel, type GridRun, type GridState, type Level, type RealtimeLevel, type RealtimeRun, type RealtimeState } from '../../src/blocks/index.js';
 import { BlockEditor } from '../../src/blocks-ui/index.js';
 
 const BOLO = { blocks: { procedure: 'Enseñar a Bolo: {name}' } };
@@ -73,6 +73,20 @@ const levels: Level[] = [
     labels: BOLO,
     meta: { goal: 'Pintá la vereda de arriba: rojo, azul, rojo, azul, rojo, azul.' },
   } satisfies GridLevel,
+  {
+    id: 'demo-poligono',
+    world: 'turtle',
+    title: 'El polígono que quieras',
+    start: { x: 150, y: 150, heading: 0, area: { width: 400, height: 400 } },
+    variants: [
+      { main: [{ id: 'h1', kind: 'call', procedure: 'polígono', args: [{ id: 'h2', kind: 'number', value: 3 }, { id: 'h3', kind: 'number', value: 60 }] }], goal: { type: 'shape', target: { polygon: { sides: 3, side: 60 } }, tolerance: 1 } },
+      { main: [{ id: 'h4', kind: 'call', procedure: 'polígono', args: [{ id: 'h5', kind: 'number', value: 6 }, { id: 'h6', kind: 'number', value: 40 }] }], goal: { type: 'shape', target: { polygon: { sides: 6, side: 40 } }, tolerance: 1 } },
+    ],
+    goal: { type: 'shape', target: { polygon: { sides: 3, side: 60 } }, tolerance: 1 },
+    toolbox: { commands: ['forward', 'turnRight'], control: ['repeat'], procedures: true, parameters: true, operators: [{ op: '/', args: [360, null] }] },
+    labels: { blocks: { procedure: 'Enseñar a Tiza: {name}' } },
+    meta: { goal: 'Enseñale a Tiza «polígono» con dos huecos (lados y largo). Para girar, usá el bloque 360 ÷ ( ).' },
+  } satisfies TurtleLevel,
   {
     id: 'demo-puente',
     world: 'realtime',
@@ -361,7 +375,7 @@ function drawInitial(): void {
   else if (level.world === 'realtime') {
     const rt = r.run as RealtimeRun;
     drawArena(level, rt.initial, new Map(rt.initial.actors.map((a) => [a.id, a])));
-  }
+  } else ctx.clearRect(0, 0, canvas.width, canvas.height); // the turtle has no 2D preview here
 }
 
 select.addEventListener('change', () => open(Number(select.value)));

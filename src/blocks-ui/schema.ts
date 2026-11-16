@@ -5,6 +5,7 @@
  */
 import {
   catalogFor,
+  childExprs,
   describeValue,
   DIRECTIONS,
   isDirection,
@@ -22,6 +23,7 @@ import {
   type Level,
   type PaletteEntry,
   type ParamSpec,
+  type PresetArg,
   type Procedure,
   type Program,
   type Statement,
@@ -50,8 +52,8 @@ export interface BlockTemplate {
   label: string;
   params: ParamSpec[];
   returns?: ValueType;
-  /** Preset arguments (the slots are fixed and not shown). */
-  args?: Value[];
+  /** Preset arguments: fixed slots (not shown, not editable) and `null` for open ones. */
+  args?: PresetArg[];
   /** `call` templates: the procedure they call. */
   procedure?: string;
   /** `var`, `set`, `change`, `subtract` templates: the variable. */
@@ -348,7 +350,14 @@ export class Schema {
    */
   instantiate(t: BlockTemplate, nextId: () => string): Statement | Expr | null {
     const id = nextId();
-    const args = (): Expr[] => t.params.map((p, i) => (t.args && i < t.args.length ? this.literal(nextId(), t.args[i]!, p.type) : this.emptyExpr(nextId(), p, t.key)));
+    // A preset's fixed slots get their value; its open slots start empty, so the child sees the hole.
+    const slot = (i: number, p: ParamSpec, fallback: () => Expr): Expr => {
+      const v = t.args?.[i];
+      if (v === undefined) return fallback();
+      return v === null ? hole(nextId()) : this.literal(nextId(), v, p.type);
+    };
+    const args = (): Expr[] => t.params.map((p, i) => slot(i, p, () => this.emptyExpr(nextId(), p, t.key)));
+    const one = (): Expr => ({ id: nextId(), kind: 'number', value: 1 });
     const n: ParamSpec = { type: 'number' };
     switch (t.key) {
       case 'repeat':
@@ -380,8 +389,7 @@ export class Schema {
       case '*':
       case '/':
       case '%': {
-        const [left, right] = [{ id: nextId(), kind: 'number', value: 1 } as Expr, { id: nextId(), kind: 'number', value: 1 } as Expr];
-        return { id, kind: 'arith', op: t.key, left, right };
+        return { id, kind: 'arith', op: t.key, left: slot(0, n, one), right: slot(1, n, one) };
       }
       case '=':
       case '!=':
@@ -393,14 +401,18 @@ export class Schema {
         return { id, kind: 'compare', op: t.key, left: left!, right: right! };
       }
       case 'and':
-      case 'or':
-        return { id, kind: t.key, left: hole(nextId()), right: hole(nextId()) };
+      case 'or': {
+        const b: ParamSpec = { type: 'boolean' };
+        return { id, kind: t.key, left: slot(0, b, () => hole(nextId())), right: slot(1, b, () => hole(nextId())) };
+      }
       case 'not':
-        return { id, kind: 'not', operand: hole(nextId()) };
+        return { id, kind: 'not', operand: slot(0, { type: 'boolean' }, () => hole(nextId())) };
       case 'opposite':
       case 'left':
-      case 'right':
-        return { id, kind: 'dirOp', op: t.key, operand: this.emptyExpr(nextId(), { type: 'direction' }) };
+      case 'right': {
+        const d: ParamSpec = { type: 'direction' };
+        return { id, kind: 'dirOp', op: t.key, operand: slot(0, d, () => this.emptyExpr(nextId(), d)) };
+      }
       default:
         if (t.creates) return null;
         if (t.group === 'sensors') return { id, kind: 'sensor', sensor: t.key, args: args() };
@@ -433,22 +445,38 @@ export class Schema {
   // -------------------------------------------------------------------------------------------
 
   /**
-   * The label template of a node in the workspace, and whether its arguments are a fixed preset
-   * (`Mover ↑`): then the view shows no slots. A preset label is used only when the toolbox does
-   * not also offer the general block.
+   * The label template of a node in the workspace, and which of its slots a preset fixes: a
+   * command preset (`Mover ↑`) fixes them all, so the view shows no slots; an operator preset
+   * (`360 ÷ ( )`) fixes some and leaves the others open. A preset label is used only when the
+   * toolbox does not also offer the general block; then `preset` is true and `fixed` lists the
+   * fixed slot indexes (which the view hides and the model refuses to edit).
    */
-  labelOf(node: Statement | Expr): { template: string; preset: boolean } {
-    if (node.kind === 'command' || node.kind === 'sensor') {
-      const key = node.kind === 'command' ? node.command : node.sensor;
-      const own = this.entries.filter((e) => e.key === key);
-      if (!own.some((e) => !e.args)) {
-        const match = own.find((e) => e.args && e.args.length === node.args.length && e.args.every((v, i) => isLitValue(node.args[i]!, v)));
-        if (match) return { template: tidy(match.label, node.kind === 'sensor'), preset: true };
-      }
-      return { template: tidy(this.template(key), node.kind === 'sensor'), preset: false };
-    }
+  labelOf(node: Statement | Expr): { template: string; preset: boolean; fixed: number[] } {
+    const round = node.kind === 'sensor' || node.kind === 'var' || node.kind === 'param';
     const key = keyOf(node);
-    return { template: tidy(this.template(key), node.kind === 'var' || node.kind === 'param'), preset: false };
+    const match = this.presetOf(node);
+    if (match) {
+      const fixed = (match.args ?? []).flatMap((v, i) => (v === null ? [] : [i]));
+      return { template: tidy(match.label, round), preset: true, fixed };
+    }
+    return { template: tidy(this.template(key), round), preset: false, fixed: [] };
+  }
+
+  /** The preset palette entry a node was made from, when the toolbox offers only presets of its block. */
+  presetOf(node: Statement | Expr): PaletteEntry | null {
+    const category = categoryOfNode(node);
+    if (!category) return null;
+    const key = keyOf(node);
+    const own = this.entries.filter((e) => e.key === key && e.category === category);
+    if (!own.length || own.some((e) => !e.args)) return null;
+    const kids = childExprs(node);
+    return own.find((e) => e.args!.length === kids.length && e.args!.every((v, i) => v === null || isLitValue(kids[i]!, v))) ?? null;
+  }
+
+  /** Whether a slot of a node is fixed by its preset (not editable). */
+  isFixed(node: Statement | Expr, slot: number): boolean {
+    const p = this.presetOf(node);
+    return !!p && p.args![slot] !== undefined && p.args![slot] !== null;
   }
 
   /** The label of a template in the palette. */
@@ -503,7 +531,26 @@ function shapeOf(key: string, returns: ValueType | undefined): Shape {
   return 'stack';
 }
 
-/** The label key of a node that is not a command or sensor. */
+/** The palette category whose presets can describe a node, or null for blocks without presets. */
+function categoryOfNode(node: Statement | Expr): PaletteEntry['category'] | null {
+  switch (node.kind) {
+    case 'command':
+      return 'command';
+    case 'sensor':
+      return 'sensor';
+    case 'arith':
+    case 'compare':
+    case 'dirOp':
+    case 'and':
+    case 'or':
+    case 'not':
+      return 'operator';
+    default:
+      return null;
+  }
+}
+
+/** The label key of a node. */
 function keyOf(node: Statement | Expr): string {
   switch (node.kind) {
     case 'if':

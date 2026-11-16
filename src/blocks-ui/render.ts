@@ -222,21 +222,21 @@ export class Renderer {
   }
 
   private segments(into: HTMLElement, node: Statement | Expr, preview: boolean): void {
-    const { template, preset } = this.schema.labelOf(node);
+    const { template, fixed } = this.schema.labelOf(node);
+    const hidden = new Set(fixed);
     const segs: Segment[] = parseTemplate(template);
     const kids = childExprs(node);
     const specs = this.schema.slots(node);
     for (const seg of segs) {
       if (seg.type === 'text') into.append(h('span', { class: 'rbk-txt' }, seg.text));
       else if (seg.type === 'slot') {
-        if (!preset && kids[seg.index]) into.append(this.slot(node, seg.index, kids[seg.index]!, specs[seg.index]?.type ?? 'any', preview));
+        if (!hidden.has(seg.index) && kids[seg.index]) into.append(this.slot(node, seg.index, kids[seg.index]!, specs[seg.index]?.type ?? 'any', preview));
       } else into.append(this.field(node, seg.field, preview));
     }
-    if (preset) return;
     const shown = new Set(templateSlots(segs));
     const proc = node.kind === 'call' ? this.model.program.procedures?.find((p) => p.name === node.procedure) : undefined;
     kids.forEach((k, i) => {
-      if (shown.has(i)) return;
+      if (shown.has(i) || hidden.has(i)) return;
       const pname = proc?.params[i];
       if (pname) into.append(h('span', { class: 'rbk-pname' }, pname));
       into.append(this.slot(node, i, k, specs[i]?.type ?? 'any', preview));
@@ -313,7 +313,8 @@ export class Renderer {
 
   /** A block in words, for screen readers and messages. */
   describe(node: Statement | Expr, withContents = false): string {
-    const { template, preset } = this.schema.labelOf(node);
+    const { template, fixed } = this.schema.labelOf(node);
+    const hidden = new Set(fixed);
     const kids = childExprs(node);
     const slots = kids.map((k) => this.describeSlot(k));
     let name = '';
@@ -321,12 +322,10 @@ export class Renderer {
     else if (node.kind === 'var' || node.kind === 'param') name = node.name;
     const fields: { var?: string; name?: string } = { name };
     if (node.kind === 'set' || node.kind === 'change') fields.var = node.variable;
-    let s = fillTemplate(template, preset ? [] : slots, fields);
-    if (!preset) {
-      const shown = new Set(templateSlots(parseTemplate(template)));
-      const rest = slots.filter((_, i) => !shown.has(i));
-      if (rest.length) s += ` ${rest.join(', ')}`;
-    }
+    let s = fillTemplate(template, slots.map((x, i) => (hidden.has(i) ? '' : x)), fields);
+    const shown = new Set(templateSlots(parseTemplate(template)));
+    const rest = slots.filter((_, i) => !shown.has(i) && !hidden.has(i));
+    if (rest.length) s += ` ${rest.join(', ')}`;
     if (withContents && 'kind' in node) {
       const lists = (node.kind === 'repeat' || node.kind === 'repeatUntil' || node.kind === 'if' ? innerLists(node as Statement) : []).map((l) => l.list.length);
       if (lists.length) s += ` (${lists.join(' / ')} ${this.text.blocks.toLowerCase()})`;

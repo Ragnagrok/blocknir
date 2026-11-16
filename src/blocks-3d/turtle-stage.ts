@@ -209,6 +209,14 @@ export class TurtleStage implements StepStage<TurtleEvent> {
     this.root.add(this.floor.group);
   }
 
+  rebuildFloor(): void {
+    this.buildFloor();
+  }
+
+  focus(): [number, number, number] {
+    return [this.mover.x, this.mover.y, this.mover.z];
+  }
+
   /** Turtle units to meters on the floor. */
   at(p: Point, out = new THREE.Vector3()): THREE.Vector3 {
     const r = this.region;

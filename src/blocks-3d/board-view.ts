@@ -1,6 +1,9 @@
 /**
  * `BoardView`: renders a block-language world (grid, turtle or realtime) on a canvas from a fixed
- * three-quarter camera that frames the whole board, and animates runs from their traces.
+ * three-quarter camera that frames the whole board, and animates runs from their traces. Boards too
+ * long to show whole at a readable size (a 30 × 1 row on a phone) get a follow camera: the whole
+ * board at reset and at the end, a closer view that pans with the character while it runs (see
+ * `CameraMode`; levels ask for it with `meta.camera: 'follow'` or `meta.camara: 'sigue'`).
  *
  * ```ts
  * const view = new BoardView(canvas, { onStep: (s) => highlight(s.node) });
@@ -31,11 +34,11 @@ import {
 import { glowSprite, View } from '../render/index.js';
 import { AssetCache } from './assets.js';
 import { defaultSkin } from './default-skin.js';
-import { frameBox, type Bounds, type Framing } from './framing.js';
+import { cameraAxes, followBox, frameBox, pixelsPerMeter, type Bounds, type Framing, type Vec3 } from './framing.js';
 import { GridStage } from './grid-stage.js';
 import { disposeObject, Poof, ScreenSprite, shareTexture } from './pieces.js';
 import { RealtimeStage, type RealtimeHud } from './realtime-stage.js';
-import type { Skin } from './skin.js';
+import type { Environment, Skin } from './skin.js';
 import type { Stage, StageContext, StepStage } from './stage.js';
 import { DEFAULT_TIMING, parseSpeed, Playhead, type Timing } from './timeline.js';
 import { TurtleStage } from './turtle-stage.js';
@@ -46,12 +49,42 @@ export type WorldKind = 'grid' | 'turtle' | 'realtime';
 /** A speed multiplier (0.1 … 16; the UI offers ×0.5 … ×4), or `'instant'`. */
 export type Speed = number | 'instant';
 
+/**
+ * How the camera behaves. `frame`: it always shows the whole board. `follow`: the whole board at
+ * reset and at the end, and a closer view that follows the character while a run plays (or a
+ * realtime game runs). `auto` (default): `follow` when the whole board would show its cells smaller
+ * than `followBelowPx`, else `frame`.
+ */
+export type CameraMode = 'auto' | 'follow' | 'frame';
+
+/** What the camera looks at now: the whole board, or the character up close. */
+export type CameraShot = 'board' | 'character';
+
+const SPANISH_CAMERA: Record<string, CameraMode> = { sigue: 'follow', seguir: 'follow', fija: 'frame', entera: 'frame', todo: 'frame', auto: 'auto' };
+
+/**
+ * The camera mode a level's `meta` asks for: `camera: 'follow' | 'frame' | 'auto'`, or the Spanish
+ * `camara: 'sigue' | 'fija' | 'entera' | 'auto'` (`sigue` follows; `fija` and `entera` frame the
+ * whole board). Null when it says nothing.
+ */
+export function cameraModeOf(meta: Record<string, unknown> | undefined): CameraMode | null {
+  if (!meta) return null;
+  const c = meta.camera;
+  if (c === 'follow' || c === 'frame' || c === 'auto') return c;
+  const es = meta.camara;
+  if (typeof es === 'string') return SPANISH_CAMERA[es.toLowerCase()] ?? null;
+  return null;
+}
+
 export interface BoardViewOptions {
   /** How names look. Default: `defaultSkin()`. */
   skin?: Skin;
   /** Texts for bubbles and fallback markers (`labelsFor(level)`). */
   labels?: Labels;
-  /** `level.meta`: `character` (a skin character name), `places` (`{"x,y": name}` labels on cells). */
+  /**
+   * `level.meta`: `character` (a skin character name), `places` (`{"x,y": name}` labels on cells),
+   * `camera` (`'follow' | 'frame' | 'auto'`, or the Spanish `camara: 'sigue' | 'fija'`).
+   */
   meta?: Record<string, unknown>;
   /** Playback speed. Default 1. */
   speed?: Speed;
@@ -81,6 +114,12 @@ export interface BoardViewOptions {
   autoResize?: boolean;
   /** Vertical field of view, in degrees. Default 36. */
   fov?: number;
+  /** Camera mode when neither `reset` nor `level.meta` (`camera`, `camara`) says. Default `auto`. */
+  camera?: CameraMode;
+  /** `auto` follows the character when the whole board would show a cell smaller than this, in CSS pixels. Default 28. */
+  followBelowPx?: number;
+  /** Size of a cell while following, in CSS pixels. Default: a seventh of the canvas's shorter side, between 44 and 72. */
+  followCellPx?: number;
 }
 
 /** Presentation options of `reset`. */
@@ -95,6 +134,8 @@ export interface ResetOptions {
   area?: { width: number; height: number };
   /** Turtle: meters per turtle unit. */
   unit?: number;
+  /** The camera for this world (over `meta.camera` / `meta.camara` and the view's `camera` option). */
+  camera?: CameraMode;
 }
 
 /** What `reset` shows: a grid or turtle state, a live realtime game, or a realtime setup and state. */
@@ -161,7 +202,14 @@ export class BoardView {
   private waiters: Array<() => void> = [];
   private speedValue: number;
   private timing: Timing;
+  /** The framing of the whole board. */
   private framing: Framing | null = null;
+  /** The camera now (it eases toward the board or the character). */
+  private cam = { target: new THREE.Vector3(), distance: 10, fitted: -1 };
+  private shotValue: CameraShot = 'board';
+  private cameraOverride: CameraMode | null = null;
+  /** The environment's backdrop, and what it was built for. */
+  private backdrop: { object: THREE.Object3D; env: Environment; key: string } | null = null;
   private sun: THREE.DirectionalLight;
   private hemi: THREE.HemisphereLight;
   private lights: THREE.PointLight[] = [];
@@ -190,6 +238,7 @@ export class BoardView {
     this.speedValue = parseSpeed(options.speed);
     this.timing = { ...DEFAULT_TIMING, ...options.timing };
     this.meta = options.meta ?? {};
+    this.assets.showDecor = options.decor !== false;
     const bloom = options.bloom ?? 0.8;
     this.view = new View(canvas, {
       preserveDrawingBuffer: options.preserveDrawingBuffer ?? false,
@@ -201,9 +250,8 @@ export class BoardView {
     r.toneMappingExposure = 1.0;
     const shadowSize = options.shadowMapSize ?? (touch ? 1024 : 2048);
     r.shadowMap.enabled = shadowSize > 0;
-    const env = this.skin.environment;
+    const env = this.assets.environment;
     const scene = this.view.scene;
-    scene.background = new THREE.Color(env.sky);
     this.view.camera.fov = options.fov ?? 36;
     this.view.camera.near = 0.1;
     this.view.camera.far = 200;
@@ -226,6 +274,7 @@ export class BoardView {
     this.sea.position.y = -0.62;
     scene.add(this.sea);
     scene.fog = new THREE.Fog(env.sky, 40, 120);
+    this.applyEnvironment(env);
     scene.add(this.poof.mesh);
     this.poof.mesh.renderOrder = 5;
 
@@ -282,6 +331,8 @@ export class BoardView {
     this.stopTrace();
     this.resetOptions = options;
     if (options.meta) this.meta = options.meta;
+    this.cameraOverride = options.camera ?? null;
+    this.shotValue = 'board';
     if (options.labels) this.assets.labels = options.labels;
     this.stage?.dispose();
     this.stage?.root.removeFromParent();
@@ -460,6 +511,7 @@ export class BoardView {
     }
     this.lastTick = now;
     s.tick(result, state ?? this.game?.state ?? s.state);
+    this.shotValue = result.status === 'running' ? 'character' : 'board';
     for (const st of result.steps) this.onStep?.(st);
     const hud = s.hud();
     this.onTick?.(hud, result);
@@ -502,12 +554,14 @@ export class BoardView {
     for (const t of p.advance(dt, speed)) {
       if (t.type === 'begin') {
         const s = this.steps[t.index]!;
+        if (!instant) this.shotValue = 'character';
         stage.begin(s, instant);
         this.onStep?.(s);
       } else if (t.type === 'end') {
         stage.end(this.steps[t.index]!, instant);
       } else {
         if (this.runError) stage.showError(this.runError);
+        this.shotValue = 'board';
         this.onDone?.({ error: this.runError });
         this.settle();
       }
@@ -529,17 +583,13 @@ export class BoardView {
     this.reframe();
   }
 
-  /** Points the camera at the whole board for the current aspect. */
+  /** Points the camera at the whole board for the current aspect (or at the character, when following). */
   private reframe(): void {
     const cam = this.view.camera;
     cam.aspect = this.size.w / this.size.h;
     const bounds: Bounds = this.stage?.bounds() ?? { min: [-2, 0, -2], max: [2, 1, 2] };
     const f = frameBox(bounds, { fov: cam.fov, aspect: cam.aspect, margin: 0.03 });
     this.framing = f;
-    cam.position.set(...f.position);
-    cam.lookAt(...f.target);
-    cam.far = Math.max(60, f.distance * 4);
-    cam.updateProjectionMatrix();
     // The sun: from the upper left, a bit in front, with a shadow box that just covers the board.
     const sx = bounds.max[0] - bounds.min[0];
     const sz = bounds.max[2] - bounds.min[2];
@@ -556,13 +606,169 @@ export class BoardView {
     sc.far = r * 5 + 10;
     sc.updateProjectionMatrix();
     this.sun.shadow.needsUpdate = true;
-    if (this.stage) this.fit(this.stage.root);
+    this.placeBackdrop(bounds);
+    // A new board or a new size: no easing, the camera is where it should be at once.
+    const goal = this.cameraGoal();
+    this.cam.target.set(...goal.target);
+    this.cam.distance = goal.distance;
+    this.cam.fitted = -1;
+    this.applyCamera();
   }
 
-  /** Pixels per meter at the board's center, for screen-sized sprites. */
+  // -------------------------------------------------------------------------------------------
+  // Camera
+  // -------------------------------------------------------------------------------------------
+
+  /** The camera mode in effect for this world: from `reset`, else `level.meta`, else the view's option. */
+  get cameraMode(): CameraMode {
+    return this.cameraOverride ?? cameraModeOf(this.meta) ?? this.options.camera ?? 'auto';
+  }
+  /** Changes the camera mode for the world shown (until the next `reset`). */
+  set cameraMode(mode: CameraMode) {
+    this.cameraOverride = mode;
+  }
+
+  /** Whether the camera follows the character in this world (always for `follow`; for `auto`, when the board is too big to show whole at a readable size). */
+  get follows(): boolean {
+    const mode = this.cameraMode;
+    if (mode !== 'auto') return mode === 'follow';
+    const f = this.framing;
+    if (!f) return false;
+    return pixelsPerMeter(f.distance, this.view.camera.fov, this.size.h) < (this.options.followBelowPx ?? 28);
+  }
+
+  /** What the camera looks at now. The view switches by itself: the character while a run plays, the board at reset and at the end. */
+  get shot(): CameraShot {
+    return this.shotValue;
+  }
+
+  /**
+   * Moves the camera to the whole board or to the character (when the view follows), easing there,
+   * or at once with `instant`. The view keeps switching by itself as runs start and end.
+   */
+  showShot(shot: CameraShot, options: { instant?: boolean } = {}): void {
+    this.shotValue = shot;
+    if (options.instant) {
+      const goal = this.cameraGoal();
+      this.cam.target.set(...goal.target);
+      this.cam.distance = goal.distance;
+      this.applyCamera();
+    }
+  }
+
+  /** Cell size while following, in CSS pixels. */
+  private followCellPx(): number {
+    return this.options.followCellPx ?? Math.max(44, Math.min(72, Math.min(this.size.w, this.size.h) / 7));
+  }
+
+  /** Where the camera should be now. */
+  private cameraGoal(): Framing {
+    const full = this.framing!;
+    if (this.shotValue !== 'character' || !this.stage || !this.follows) return full;
+    const focus: Vec3 | null = this.stage.focus();
+    if (!focus) return full;
+    const cam = this.view.camera;
+    return followBox(this.stage.bounds(), focus, { fov: cam.fov, aspect: cam.aspect, margin: 0.03, viewportHeight: this.size.h, cellPx: this.followCellPx(), full });
+  }
+
+  /** Eases the camera toward its goal. */
+  private updateCamera(dt: number): void {
+    if (!this.framing) return;
+    const goal = this.cameraGoal();
+    const rate = 2.6 + 1.2 * Math.min(4, Number.isFinite(this.speedValue) ? this.speedValue : 4);
+    const k = 1 - Math.exp(-dt * rate);
+    const t = this.cam.target;
+    t.x += (goal.target[0] - t.x) * k;
+    t.y += (goal.target[1] - t.y) * k;
+    t.z += (goal.target[2] - t.z) * k;
+    this.cam.distance += (goal.distance - this.cam.distance) * k;
+    this.applyCamera();
+  }
+
+  private applyCamera(): void {
+    const cam = this.view.camera;
+    const f = this.framing;
+    if (!f) return;
+    const { forward } = cameraAxes(f.pitch);
+    const d = this.cam.distance;
+    const t = this.cam.target;
+    cam.position.set(t.x - forward[0] * d, t.y - forward[1] * d, t.z - forward[2] * d);
+    cam.lookAt(t);
+    const far = Math.max(60, d * 4);
+    if (cam.far !== far) {
+      cam.far = far;
+      cam.updateProjectionMatrix();
+    }
+    // Screen-sized sprites and fog follow the distance (refit only when it changed enough).
+    if (this.cam.fitted < 0 || Math.abs(d - this.cam.fitted) > this.cam.fitted * 0.01) {
+      this.cam.fitted = d;
+      const fog = this.view.scene.fog;
+      if (fog instanceof THREE.Fog) {
+        fog.near = Math.max(40, d * 1.5 + 10);
+        fog.far = fog.near + 80;
+      }
+      if (this.stage) this.fit(this.stage.root);
+    }
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Environment
+  // -------------------------------------------------------------------------------------------
+
+  /** Sky, sea, sand, light and decor now. */
+  get environment(): Environment {
+    return this.assets.environment;
+  }
+
+  /**
+   * Changes sky, sea, sand, light or decor live (a new background theme) without recreating the
+   * view or the world: the lights and colors change at once and the floor around the board is
+   * rebuilt. Fields left out keep their current value; the skin itself is not changed.
+   */
+  setEnvironment(env: Partial<Environment>): void {
+    const next: Environment = { ...this.assets.environment, ...env };
+    this.assets.setEnvironment(next);
+    this.applyEnvironment(next);
+    this.stage?.rebuildFloor();
+    if (this.stage) this.placeBackdrop(this.stage.bounds());
+  }
+
+  /** Builds the environment's backdrop for this board (once per environment and board size) and places it. */
+  private placeBackdrop(bounds: Bounds): void {
+    const env = this.assets.environment;
+    const width = bounds.max[0] - bounds.min[0];
+    const depth = bounds.max[2] - bounds.min[2];
+    const key = `${this.kind}:${width.toFixed(3)}x${depth.toFixed(3)}`;
+    const b = this.backdrop;
+    if (b && (b.env !== env || b.key !== key || !this.stage)) {
+      b.object.removeFromParent();
+      disposeObject(b.object);
+      this.backdrop = null;
+    }
+    if (!this.backdrop && env.backdrop && this.stage && this.kind) {
+      const object = env.backdrop({ width, depth, world: this.kind });
+      this.view.scene.add(object);
+      this.backdrop = { object, env, key };
+    }
+    this.backdrop?.object.position.set((bounds.min[0] + bounds.max[0]) / 2, this.sea.position.y, bounds.min[2]);
+  }
+
+  private applyEnvironment(env: Environment): void {
+    const scene = this.view.scene;
+    if (scene.background instanceof THREE.Color) scene.background.setHex(env.sky);
+    else scene.background = new THREE.Color(env.sky);
+    if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(env.sky);
+    this.hemi.color.setHex(env.ambient.sky);
+    this.hemi.groundColor.setHex(env.ambient.ground);
+    this.hemi.intensity = env.ambient.intensity;
+    this.sun.color.setHex(env.sun.color);
+    this.sun.intensity = env.sun.intensity;
+    (this.sea.material as THREE.MeshLambertMaterial).color.setHex(env.sea);
+  }
+
+  /** Pixels per meter at the camera's target, for screen-sized sprites. */
   private pxPerMeter(): number {
-    const d = this.framing?.distance ?? 10;
-    return this.size.h / (2 * Math.tan(((this.view.camera.fov * Math.PI) / 180) / 2) * d);
+    return pixelsPerMeter(this.cam.distance, this.view.camera.fov, this.size.h);
   }
 
   private fit(o: THREE.Object3D): void {
@@ -579,6 +785,7 @@ export class BoardView {
     this.time += dt;
     if (this.playhead && this.playhead.state === 'playing') this.pump(dt);
     this.stage?.update(dt, this.time);
+    this.updateCamera(dt);
     this.poof.update(dt);
     if (this.visible) this.view.render(this.time);
   }
@@ -586,11 +793,16 @@ export class BoardView {
   /** Draws a frame now (for screenshots right after a change). */
   render(): void {
     this.stage?.update(0, this.time);
+    this.applyCamera();
     this.view.render(this.time);
   }
 
-  /** Stops the loop and frees everything the view made (the canvas stays). */
-  destroy(): void {
+  /**
+   * Stops the loop and frees everything the view made, and releases the WebGL context (browsers
+   * allow only a few at once), so a host can create and destroy many views. The canvas stays in the
+   * page, but its context is lost: give a new view a new canvas, or pass `{ loseContext: false }`.
+   */
+  destroy(options: { loseContext?: boolean } = {}): void {
     if (this.destroyed) return;
     this.destroyed = true;
     this.stopTrace();
@@ -599,6 +811,8 @@ export class BoardView {
     this.visibility?.disconnect();
     this.stage?.dispose();
     this.stage = null;
+    if (this.backdrop) disposeObject(this.backdrop.object);
+    this.backdrop = null;
     this.assets.dispose();
     this.poof.dispose();
     this.sea.geometry.dispose();
@@ -608,7 +822,7 @@ export class BoardView {
     for (const l of this.lights) l.dispose();
     disposeObject(this.view.scene);
     this.view.scene.clear();
-    this.view.dispose();
+    this.view.dispose(options);
   }
 }
 

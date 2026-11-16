@@ -105,6 +105,21 @@ describe('actors, touches and signals', () => {
     expect(g.state.actors.find((a) => a.kind === 'flower')!.look).toBe('open');
   });
 
+  it('touching() is not used up: it says yes on every tick while the cell is shared', () => {
+    const setup: RealtimeSetup = { arena: arena(5, 1), player: { x: 0, y: 0 }, actors: [{ kind: 'flower', x: 2, y: 0 }], variables: { points: 0, once: 0 } };
+    const p = b.program(
+      [b.until(b.bool(false), b.if(b.sensor('touching', 'flower'), b.change('points', 1)), b.if(b.sensor('touched', 'flower'), b.change('once', 1)))],
+      [],
+      [b.on({ type: 'key', key: 'right' }, b.cmd('move', 'E'))],
+    );
+    const g = new RealtimeGame(setup, p);
+    g.step(['right']);
+    g.step(['right']);
+    for (let i = 0; i < 4; i++) g.step();
+    expect(g.state.variables.points).toBeGreaterThanOrEqual(4);
+    expect(g.state.variables.once).toBe(1);
+  });
+
   it('tiles wake touch handlers when an actor steps on them', () => {
     const setup: RealtimeSetup = { arena: { width: 3, height: 1, tiles: [{ x: 2, y: 0, tile: 'water' }] }, player: { x: 0, y: 0 } };
     const p = b.program([], [], [b.on({ type: 'key', key: 'right' }, b.cmd('move', 'E')), b.on({ type: 'touch', what: 'water' }, b.cmd('lose'))]);

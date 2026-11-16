@@ -74,13 +74,7 @@ export class GridStage implements StepStage<GridEvent> {
   ) {
     this.state = cloneGridState(state);
     const s = this.state;
-    this.floor = buildFloor(
-      ctx.assets,
-      s.width,
-      s.height,
-      (x, y) => s.cells[x + y * s.width]!.terrain,
-      (x, y) => s.cells[x + y * s.width]!.wall,
-    );
+    this.floor = this.makeFloor();
     this.root.add(this.floor.group);
     this.buildStatics();
     const paintMat = new THREE.MeshStandardMaterial({ roughness: 0.75, color: 0xffffff });
@@ -97,6 +91,25 @@ export class GridStage implements StepStage<GridEvent> {
     this.placeRobot();
     this.mover.heading = headingOf(s.robot.facing);
     this.mover.update(0);
+  }
+
+  /** Terrain never changes during a run, so the floor is built from the first state. */
+  private makeFloor(): Floor {
+    const s = this.state;
+    const { width, height } = s;
+    const cells = s.cells.map((c) => ({ terrain: c.terrain, wall: c.wall }));
+    return buildFloor(this.ctx.assets, width, height, (x, y) => cells[x + y * width]!.terrain, (x, y) => cells[x + y * width]!.wall);
+  }
+
+  rebuildFloor(): void {
+    this.floor.dispose();
+    this.floor.group.removeFromParent();
+    this.floor = this.makeFloor();
+    this.root.add(this.floor.group);
+  }
+
+  focus(): [number, number, number] {
+    return [this.mover.x, this.mover.y, this.mover.z];
   }
 
   private cell(x: number, y: number): [number, number, number] {
@@ -400,7 +413,7 @@ export class GridStage implements StepStage<GridEvent> {
         const split = e.moved ? 0.4 : 1;
         return {
           weight: w,
-          start: () => m.once('action', t.action * 0.8, e.moved ? 'jump' : 'idle'),
+          start: () => m.once('action', t.action * 0.8, e.moved ? 'jump' : 'idle', { action: e.action, args: e.args }),
           update: (k) => {
             if (k >= split * 0.6) doApply();
             if (from && to && k > split) {

@@ -112,7 +112,7 @@ Toolboxes and label tables use these keys.
   ],
   "sensors": [{ "name": "itemHere", "args": ["lamp"], "label": "¿Hay farol?" }],
   "control": ["repeat", "repeatUntil", "if", "ifElse", "wait"],
-  "operators": ["or", "=", "/"],
+  "operators": ["or", "=", { "op": "/", "args": [360, null] }],     // `360 ÷ ( )`: 360 fixed, one hole
   "procedures": true, "parameters": true, "variables": true,
   "events": ["start"],
   "choices": { "directions": ["N", "E", "S", "W"], "names": ["red", "blue"], "keys": ["left", "right"] },
@@ -122,6 +122,16 @@ Toolboxes and label tables use these keys.
 
 - Presets are how the book's one-purpose blocks (`¿Hay manzana?`, `Mover ↑`, `Pintar`) are made:
   a program may only use that command with exactly those literal arguments.
+- An argument `null` leaves that slot **open**: the preset fixes the other arguments and the child
+  fills the hole. Operators take presets too, as `{ "op", "args", "label" }`: `{ "op": "/", "args":
+  [360, null] }` is a ready-made `360 ÷ ( )` reporter (the `360` is fixed and not editable; the
+  divisor is a hole for, say, the `lados` parameter). A program may then divide only 360 by
+  something, unless the plain `"/"` is offered too (then the editor shows an ordinary `÷` block).
+  Works for any operator: `{ "op": "=", "args": [null, 3] }`, `{ "op": "not" }`.
+- A preset's `label` shows only the open slots (`"360 ÷ {1}"`: slot numbers are the operator's,
+  `{0}` left, `{1}` right). Without a label, the block's label is used with each fixed value written
+  in: `{ "name": "move", "args": ["E"] }` is `Mover →`, `{ "op": "/", "args": [360, null] }` is
+  `360 ÷ {1}`. A label without `{1}` for an open slot still gets the slot, at the end.
 - `countBlocks(program, scope)`: every statement and reporter counts 1, literals count 0 (a
   `Repetir 30 veces` with one block inside is 2). `parScope: 'main'` (the default) counts only the
   main stack and handler bodies, not procedure definitions; `'all'` counts everything, each
@@ -300,7 +310,9 @@ an error), `forward()`, `turnLeft()`, `turnRight()`, `turnAround()`, `face(dir)`
 `lose()`.
 
 **Sensors**: `canMove(dir)`, `canMoveForward()`, `atEdge(dir)`, `posX()`, `posY()`, `facing()`,
-`touching(kind)` (now), `touched(kind)` (yes **once per new contact**), `received(signal)` (yes
+`touching(kind)` ("am I touching one **now**?": true while sharing a cell, every time it is asked,
+never used up), `touched(kind)` (yes **once per new contact**: the first question uses it up, so a
+loop that adds points counts each touch once; it also catches actors that swapped cells), `received(signal)` (yes
 once per signal sent by any actor: "the light hit a cloud"), `tileHere(tile)`, `heard()` /
 `heardSound(name)` (sounds of this tick and the previous one), `random(min, max)` (seeded),
 `directionTo(kind)`, `distanceTo(kind)` (-1 if none), `count(kind)`, `keyPressed(key)`, `tick()`.
@@ -387,9 +399,11 @@ result.cases;        // per case: { index, passed, reason, error, run }
 
 - `palette(level)` gives the offered blocks in a stable order: `{ key, category, label, params,
   returns?, args? }`. `label` is the Spanish template; `params` the slot types (`number`,
-  `boolean`, `direction`, `name`, `any`); `args` the fixed values of presets (render them without
-  open slots). Categories: `command`, `sensor`, `control`, `operator`, `variable`, `procedure`,
-  `event`.
+  `boolean`, `direction`, `name`, `any`); `args` the preset values, one per slot: a value is fixed
+  (render it as text, do not let it be edited), `null` is an open slot (render the hole; `label`
+  has its `{i}`). Categories: `command`, `sensor`, `control`, `operator`, `variable`, `procedure`,
+  `event`. `matchesPreset(args, node args)` tells whether a node is that preset;
+  `presetLabel(template, args, labels)` writes fixed values into a template.
 - Reporters return `boolean` (pointy pieces), `number`, `direction` or `name` (round pieces).
 - Offer `toolbox.choices` in dropdowns; translate values with `describeValue(v, labels)`.
 - Show `toolbox.par` and `countBlocks(program, toolbox.parScope ?? 'main')` live; with `strictPar`,

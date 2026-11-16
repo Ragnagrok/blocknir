@@ -1,7 +1,7 @@
 /**
  * Toolboxes (which blocks a level offers), block keys, block counting and static checks.
  */
-import { walkProgram, isLiteral, type ArithOp, type CompareOp, type DirOp, type EventType, type Node, type NodeContext, type Program } from './ast.js';
+import { childExprs, walkProgram, isLiteral, type ArithOp, type CompareOp, type DirOp, type EventType, type Expr, type Node, type NodeContext, type Program } from './ast.js';
 import type { ErrorCode, RunError } from './errors.js';
 import { DEFAULT_LABELS, errorMessage, type Labels } from './labels.js';
 import type { BlockSpec } from './interpreter.js';
@@ -15,16 +15,46 @@ export type ControlBlock = 'repeat' | 'repeatUntil' | 'if' | 'ifElse' | 'wait';
 export type OperatorBlock = ArithOp | CompareOp | 'and' | 'or' | 'not' | DirOp;
 
 /**
+ * A fixed argument of a preset block, or `null` for a slot left open (a hole the child fills).
+ * `[360, null]` on `/` is the reporter `360 ÷ ( )`.
+ */
+export type PresetArg = Value | null;
+
+/**
  * A command or sensor in a toolbox: by name (any arguments allowed), or a preset block with fixed
  * literal arguments and its own label, like `{ name: 'itemHere', args: ['apple'], label: '¿Hay manzana?' }`
  * or `{ name: 'move', args: ['N'], label: 'Mover ↑' }`. A program may use the command with those
- * exact arguments only (unless another entry allows more).
+ * exact arguments only (unless another entry allows more). A `null` argument leaves that slot open:
+ * `{ name: 'goTo', args: [0, null], label: 'Ir a la fila {1}' }`.
  */
-export type ToolboxEntry = string | { name: string; args?: Value[]; label?: string };
+export type ToolboxEntry = string | { name: string; args?: PresetArg[]; label?: string };
+
+/**
+ * An operator in a toolbox: by name (`'/'`, `'and'`), or a preset reporter with some arguments
+ * fixed and the others open (`null`): `{ op: '/', args: [360, null] }` is `360 ÷ ( )`. The fixed
+ * part is not editable, and a program may only use the operator that way (unless the plain
+ * operator is offered too). `label` is the template with `{i}` for the open slots only; by default
+ * it is the operator's label with the fixed values written in (`360 ÷ {1}`).
+ */
+export type OperatorEntry = OperatorBlock | { op: OperatorBlock; args?: PresetArg[]; label?: string };
 
 /** The command or sensor name of a toolbox entry. */
 export function entryName(e: ToolboxEntry): string {
   return typeof e === 'string' ? e : e.name;
+}
+
+/** The operator of an operator entry. */
+export function operatorName(e: OperatorEntry): OperatorBlock {
+  return typeof e === 'string' ? e : e.op;
+}
+
+/** Whether a node's arguments fit a preset's: fixed ones are equal literals, `null` takes anything. */
+export function matchesPreset(preset: readonly PresetArg[], args: readonly Expr[]): boolean {
+  return preset.length === args.length && preset.every((v, i) => {
+    if (v === null) return true;
+    const a = args[i]!;
+    return isLiteral(a) && a.value === v;
+  });
 }
 
 /**
@@ -37,7 +67,8 @@ export interface Toolbox {
   /** World sensors. */
   sensors?: ToolboxEntry[];
   control?: ControlBlock[];
-  operators?: OperatorBlock[];
+  /** Operators by name, or preset reporters with fixed arguments (`{ op: '/', args: [360, null] }`). */
+  operators?: OperatorEntry[];
   /** Defining and calling procedures. */
   procedures?: boolean;
   /** Procedures with parameters (needs `procedures`). */
@@ -117,11 +148,15 @@ function matchesEntry(entries: readonly ToolboxEntry[] | undefined, name: string
   return (entries ?? []).some((e) => {
     if (typeof e === 'string') return e === name;
     if (e.name !== name) return false;
-    if (!e.args) return true;
-    return e.args.length === args.length && e.args.every((v, i) => {
-      const a = args[i]!;
-      return isLiteral(a) && a.value === v;
-    });
+    return !e.args || matchesPreset(e.args, args as Expr[]);
+  });
+}
+
+function matchesOperator(entries: readonly OperatorEntry[] | undefined, op: OperatorBlock, args: readonly Expr[]): boolean {
+  return (entries ?? []).some((e) => {
+    if (typeof e === 'string') return e === op;
+    if (e.op !== op) return false;
+    return !e.args || matchesPreset(e.args, args);
   });
 }
 
@@ -158,11 +193,11 @@ export function allows(toolbox: Toolbox, node: Node): boolean {
     case 'arith':
     case 'compare':
     case 'dirOp':
-      return (toolbox.operators ?? []).includes(node.op);
+      return matchesOperator(toolbox.operators, node.op, childExprs(node));
     case 'and':
     case 'or':
     case 'not':
-      return (toolbox.operators ?? []).includes(node.kind);
+      return matchesOperator(toolbox.operators, node.kind, childExprs(node));
   }
 }
 

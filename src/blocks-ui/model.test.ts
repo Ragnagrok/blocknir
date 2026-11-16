@@ -80,8 +80,8 @@ describe('schema: palette templates and new blocks', () => {
     expect(cond.kind === 'if' && isHole(cond.condition)).toBe(true);
     const preset = reporter('sensor:itemHere:["lamp"]');
     expect(preset).toMatchObject({ kind: 'sensor', sensor: 'itemHere', args: [{ kind: 'name', value: 'lamp' }] });
-    expect(schema.labelOf(preset)).toEqual({ template: '¿Hay farol?', preset: true });
-    expect(schema.labelOf(move)).toEqual({ template: 'Mover {0}', preset: false });
+    expect(schema.labelOf(preset)).toMatchObject({ template: '¿Hay farol?', preset: true });
+    expect(schema.labelOf(move)).toMatchObject({ template: 'Mover {0}', preset: false });
     const ids = [move, rep, cond, preset].flatMap((n) => [n.id]);
     expect(new Set(ids).size).toBe(4);
   });
@@ -599,10 +599,36 @@ describe('model: more edges', () => {
     const presets: GridLevel = { ...lamps, toolbox: { ...lamps.toolbox, commands: [{ name: 'move', args: ['E'], label: 'Mover →' }, 'lightLamp'] } };
     const { schema, stmt } = setup(presets);
     const m = stmt('command:move:["E"]');
-    expect(schema.labelOf(m)).toEqual({ template: 'Mover →', preset: true });
+    expect(schema.labelOf(m)).toMatchObject({ template: 'Mover →', preset: true });
     const both: GridLevel = { ...lamps, toolbox: { ...lamps.toolbox, commands: [{ name: 'move', args: ['E'], label: 'Mover →' }, 'move'] } };
     const s2 = new Schema(both);
-    expect(s2.labelOf(m)).toEqual({ template: 'Mover {0}', preset: false });
+    expect(s2.labelOf(m)).toMatchObject({ template: 'Mover {0}', preset: false });
+  });
+
+  it('an operator preset (360 ÷ ( )) shows its fixed part as text and keeps it fixed', () => {
+    const level: GridLevel = { ...lamps, toolbox: { ...lamps.toolbox, operators: [{ op: '/', args: [360, null] }] } };
+    const { schema, model, stmt, make, tpl } = setup(level);
+    const t = tpl('operator:/:[360,null]');
+    expect(schema.labelOfTemplate(t)).toBe('360 ÷ {1}');
+    const div = make('operator:/:[360,null]');
+    expect(div).toMatchObject({ kind: 'arith', op: '/', left: { kind: 'number', value: 360 } });
+    expect(isHole((div as Extract<Expr, { kind: 'arith' }>).right)).toBe(true);
+    expect(schema.labelOf(div)).toEqual({ template: '360 ÷ {1}', preset: true, fixed: [0] });
+    const r = stmt('control:repeat');
+    model.insert(r);
+    expect(model.putExpr(div, { parent: r.id, slot: 0 }).ok).toBe(true);
+    expect(model.setValue({ parent: div.id, slot: 0 }, 180)).toEqual({ ok: false, reason: 'fixed' });
+    expect(model.clearSlot({ parent: div.id, slot: 0 })).toEqual({ ok: false, reason: 'fixed' });
+    expect(model.putExpr(make('sensor:itemHere:["lamp"]'), { parent: div.id, slot: 0 })).toEqual({ ok: false, reason: 'fixed' });
+    expect(model.setValue({ parent: div.id, slot: 1 }, 6).ok).toBe(true);
+    expect(model.clearSlot({ parent: div.id, slot: 1 }).ok).toBe(true);
+    const back = (model.program.main[0] as Extract<Statement, { kind: 'repeat' }>).times as Extract<Expr, { kind: 'arith' }>;
+    expect(back.left).toMatchObject({ kind: 'number', value: 360 });
+    expect(isHole(back.right)).toBe(true);
+    // With the plain operator offered too, the block is an ordinary division.
+    const both = new Schema({ ...level, toolbox: { ...level.toolbox, operators: [{ op: '/', args: [360, null] }, '/'] } });
+    expect(both.labelOf(div)).toMatchObject({ preset: false, fixed: [] });
+    expect(both.isFixed(div, 0)).toBe(false);
   });
 
   it('a strict par refuses new blocks but allows edits that do not add any', () => {

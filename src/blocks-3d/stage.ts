@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import type { RunError, TraceStep } from '../blocks/index.js';
 import type { AssetCache } from './assets.js';
-import type { Bounds } from './framing.js';
+import type { Bounds, Vec3 } from './framing.js';
 import { angleDelta, type Poof } from './pieces.js';
-import type { CharacterVisual } from './skin.js';
+import type { CharacterVisual, PoseInfo } from './skin.js';
 
 export interface StageContext {
   assets: AssetCache;
@@ -31,6 +31,10 @@ export interface Stage {
   celebrate(): void;
   /** A bubble over the main character. */
   message(text: string, style: 'say' | 'error'): void;
+  /** Where the main character stands now (the follow camera looks at it), or null. */
+  focus(): Vec3 | null;
+  /** Builds the floor again (the environment changed: sand, decor). */
+  rebuildFloor(): void;
   dispose(): void;
 }
 
@@ -56,6 +60,8 @@ export class Mover {
   heading = 0;
   clip = 'idle';
   clipTime = 0;
+  /** What the clip is for (the level action of an `action` clip). */
+  info: PoseInfo | undefined = undefined;
   /** Extra tilt (bumps), radians around x. */
   tilt = 0;
   scale = 1;
@@ -64,17 +70,18 @@ export class Mover {
 
   constructor(readonly visual: CharacterVisual) {}
 
-  play(clip: string, restart = false): void {
+  play(clip: string, restart = false, info?: PoseInfo): void {
     if (clip !== this.clip || restart) {
       this.clip = clip;
       this.clipTime = 0;
+      this.info = info;
     }
     this.after = null;
   }
 
   /** Plays `clip` for `seconds` (clip time), then `then`. */
-  once(clip: string, seconds: number, then = 'idle'): void {
-    this.play(clip, true);
+  once(clip: string, seconds: number, then = 'idle', info?: PoseInfo): void {
+    this.play(clip, true, info);
     this.after = { clip: then, at: seconds };
   }
 
@@ -90,12 +97,13 @@ export class Mover {
       this.after = null;
       this.clip = next;
       this.clipTime = 0;
+      this.info = undefined;
     }
     const o = this.visual.object;
     o.position.set(this.x, this.y, this.z);
     o.rotation.set(this.tilt, this.heading, 0, 'YXZ');
     o.scale.setScalar(this.scale);
-    this.visual.pose(this.clip, this.clipTime);
+    this.visual.pose(this.clip, this.clipTime, this.info);
   }
 
   /** Where speech bubbles go. */
