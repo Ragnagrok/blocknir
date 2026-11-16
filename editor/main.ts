@@ -141,7 +141,7 @@ async function main(): Promise<void> {
       button('Open…', () => void open(), false, 'Ctrl+O · .json files, also in the legacy Spanish format'),
       button('Save', () => void save(), false, `Ctrl+S · ${store === 'disk' ? 'writes the project file' : 'browser storage (also autosaved)'}`),
       button('Save as…', () => void saveAs(), false, 'Ctrl+Shift+S · download a .json copy'),
-      button('Play', () => void play(), false, 'Opens the project in the adventure player'),
+      button('Play', () => void play(), false, new URLSearchParams(location.search).has('play') ? 'Saves and opens the project in your game' : 'Saves and opens the project in the adventure player'),
       h('span', { class: 'gap' }),
       button('Voxels', () => switchTab('voxels'), current === 'voxels'),
       button('Scene', () => switchTab('scene'), current === 'scene'),
