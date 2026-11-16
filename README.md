@@ -38,6 +38,9 @@ Then open the address Vite prints:
 - `/examples/adventure/`: a minimal fixed-camera adventure that plays any project from the editor.
 - `/examples/room/`: the smallest example, a diorama built in code.
 
+To point **Play** at your own game instead of the adventure example, open the editor with
+`/editor/?play=<url>`.
+
 To save the editor's project to a file on disk while developing:
 
 ```sh

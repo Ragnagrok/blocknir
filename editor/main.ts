@@ -130,7 +130,9 @@ async function main(): Promise<void> {
 
   const play = async (): Promise<void> => {
     clearTimeout(autosave);
-    if (await save()) window.open(new URL('../examples/adventure/', location.href).href, 'ragnagrok-adventure');
+    // `?play=<url>` lets a game point Play at its own runtime (for example, its dev server).
+    const target = new URLSearchParams(location.search).get('play') ?? '../examples/adventure/';
+    if (await save()) window.open(new URL(target, location.href).href, 'ragnagrok-play');
   };
 
   const repaint = (): void => {

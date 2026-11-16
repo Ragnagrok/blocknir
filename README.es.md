@@ -43,6 +43,9 @@ Abrí la dirección que muestra Vite:
   editor.
 - `/examples/room/`: el ejemplo más chico, un diorama armado por código.
 
+Para que **Play** abra tu propio juego en vez del ejemplo de aventura, abrí el editor con
+`/editor/?play=<url>`.
+
 Para que el editor guarde el proyecto en un archivo del disco mientras desarrollás:
 
 ```sh
