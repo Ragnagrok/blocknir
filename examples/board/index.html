@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Board · Ragnagrok Engine</title>
+    <style>
+      :root {
+        --ink: #23384f;
+        --paper: #fffaf0;
+        --line: #e7d9bd;
+        --accent: #ff8a3a;
+        --accent-ink: #ffffff;
+        --hi: #ffe28a;
+        font: 15px/1.35 "Nunito", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+        color: var(--ink);
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: #a6def4; }
+      body { display: grid; grid-template-rows: auto 1fr auto; height: 100dvh; }
+      header, footer { background: var(--paper); border-color: var(--line); border-style: solid; border-width: 0; padding: 8px 12px; }
+      header { border-bottom-width: 2px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      footer { border-top-width: 2px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+      h1 { font-size: 16px; margin: 0 8px 0 0; }
+      button { font: inherit; font-weight: 800; color: var(--ink); background: #fff; border: 2px solid var(--line); border-radius: 10px; padding: 6px 12px; cursor: pointer; }
+      button[aria-pressed="true"] { background: var(--hi); border-color: #e8c25a; }
+      button.primary { background: var(--accent); color: var(--accent-ink); border-color: #e06a1a; }
+      main { position: relative; min-height: 0; display: grid; grid-template-columns: 1fr minmax(200px, 280px); }
+      canvas { display: block; width: 100%; height: 100%; min-height: 0; touch-action: none; }
+      .stage { position: relative; min-height: 0; }
+      #program { background: var(--paper); border-left: 2px solid var(--line); padding: 10px 12px; overflow: auto; font-size: 14px; margin: 0; }
+      #program div { padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
+      #program div.on { background: var(--hi); font-weight: 800; }
+      #hud { position: absolute; top: 10px; left: 10px; display: none; gap: 8px; }
+      #hud span { background: rgba(255, 250, 240, 0.92); border: 2px solid var(--line); border-radius: 999px; padding: 4px 12px; font-weight: 800; }
+      #pad { position: absolute; bottom: 12px; left: 0; right: 0; display: none; justify-content: center; gap: 16px; }
+      #pad button { width: 64px; height: 64px; font-size: 26px; border-radius: 50%; background: rgba(255, 255, 255, 0.9); }
+      #status { font-weight: 800; min-width: 10ch; }
+      label { display: flex; gap: 6px; align-items: center; }
+      @media (max-width: 720px) {
+        main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+        #program { border-left: 0; border-top: 2px solid var(--line); max-height: 22vh; }
+        h1 { width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Bloques en 3D</h1>
+      <span id="levels"></span>
+    </header>
+    <main>
+      <div class="stage">
+        <canvas id="view"></canvas>
+        <div id="hud"><span id="score">Puntos 0</span><span id="lives">Vidas 3</span></div>
+        <div id="pad"><button data-key="left" aria-label="Izquierda">◀</button><button data-key="right" aria-label="Derecha">▶</button></div>
+      </div>
+      <pre id="program"></pre>
+    </main>
+    <footer>
+      <button class="primary" id="run">Ejecutar</button>
+      <button id="step">Un paso</button>
+      <button id="pause">Pausa</button>
+      <button id="reset">Reiniciar</button>
+      <label>Velocidad <input id="speed" type="range" min="0" max="4" step="1" value="1" /> <span id="speedText">×1</span></label>
+      <span id="status"></span>
+    </footer>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

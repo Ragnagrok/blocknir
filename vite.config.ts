@@ -81,6 +81,8 @@ export default defineConfig({
         editor: resolve('editor/index.html'),
         room: resolve('examples/room/index.html'),
         adventure: resolve('examples/adventure/index.html'),
+        board: resolve('examples/board/index.html'),
+        blocks: resolve('examples/blocks/index.html'),
       },
     },
   },

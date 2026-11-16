@@ -10,6 +10,8 @@ Nullgard). Code, comments and identifiers in English; README in English and Span
     src/kit/     game helpers: touch joystick, dialogue box, cutscene director, actor, save slots
     src/paint/   procedural voxel painting (shapes, noise) that produces Models
     src/blocks/  pure: kids' block language, interpreter, grid/turtle/realtime worlds, levels and check()
+    src/blocks-ui/ DOM: touch-friendly block editor for the blocks language
+    src/blocks-3d/ three.js: renders and animates grid, turtle and realtime worlds from traces, with skins
     editor/      the browser editor (models, figures and animation, scenes)
     examples/    small original demos
 

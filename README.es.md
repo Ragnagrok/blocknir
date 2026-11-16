@@ -104,6 +104,8 @@ audio.play((sfx) => sfx.step('stone'));
 | `ragnagrok-engine/kit` | `Joystick`, `Dialogue`, `Director`, `Actor`, `SaveSlot`. |
 | `ragnagrok-engine/paint` | `VoxelCanvas` y funciones de ruido para modelos procedurales, y `createHumanoid`, un personaje de voxels paramétrico (piel, pelo, ropa, anteojos, barba, silueta) ya articulado con clips de reposo, caminar, consultar y hablar. |
 | `ragnagrok-engine/blocks` | Un lenguaje de programación con bloques para chicos y su intérprete, con los mundos donde corren los programas: una grilla con un robot (objetos, faroles, flechas, paredes, acciones definidas por cada nivel), una tortuga que dibuja y una arena en tiempo real por tics con actores que tienen sus propios guiones. Los niveles, los objetivos y las trazas de ejecución son JSON; `check(nivel, programa)` prueba un programa en todos los tableros y explica por qué falla, en español por defecto. Sin DOM ni three.js. Ver [`src/blocks/README.md`](src/blocks/README.md). |
+| `ragnagrok-engine/blocks-ui` | `BlockEditor`: un editor de bloques pensado para el dedo (arrastrar, tocar o teclado), que cuenta los bloques contra el límite del nivel, marca el bloque que se ejecuta, muestra los errores en un globito, tiene deshacer y tema claro u oscuro. DOM puro, sin framework. |
+| `ragnagrok-engine/blocks-3d` | `BoardView`: dibuja y anima en voxels los mundos de grilla, tortuga y tiempo real a partir de una traza, con skins para que cada juego tenga sus personajes, objetos y pisos. Trae una skin por defecto. |
 
 Las posiciones van en metros, el tamaño de los modelos en voxels y los ángulos en radianes. Un rumbo
 0 mira hacia +z. El código está en inglés; [`GLOSSARY.md`](GLOSSARY.md) traduce cada nombre al que

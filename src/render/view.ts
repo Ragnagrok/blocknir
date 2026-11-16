@@ -64,8 +64,20 @@ export class View {
   private finish: ShaderPass;
   private bloom: UnrealBloomPass;
 
-  /** `preserveDrawingBuffer` keeps the last frame readable (screenshots, thumbnails). */
-  constructor(canvas: HTMLCanvasElement, options: { preserveDrawingBuffer?: boolean } = {}) {
+  /**
+   * `preserveDrawingBuffer` keeps the last frame readable (screenshots, thumbnails). `finish: false`
+   * skips the lens pass (vignette, grain, aberration). `bloom` tunes the glow (a high `threshold`
+   * makes only emissive voxels glow; `strength: 0` turns it off). `samples` is the MSAA level.
+   */
+  constructor(
+    canvas: HTMLCanvasElement,
+    options: {
+      preserveDrawingBuffer?: boolean;
+      finish?: boolean;
+      bloom?: { strength?: number; radius?: number; threshold?: number };
+      samples?: number;
+    } = {},
+  ) {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: false,
@@ -76,14 +88,16 @@ export class View {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
-
-    const target = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 });
+    const target = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: options.samples ?? 4 });
     this.composer = new EffectComposer(this.renderer, target);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(4, 4), 0.42, 0.7, 0.85);
+    const b = options.bloom ?? {};
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(4, 4), b.strength ?? 0.42, b.radius ?? 0.7, b.threshold ?? 0.85);
+    this.bloom.enabled = (b.strength ?? 0.42) > 0;
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.finish = new ShaderPass(FINISH);
+    this.finish.enabled = options.finish ?? true;
     this.composer.addPass(this.finish);
   }
 
@@ -103,5 +117,13 @@ export class View {
   render(time: number): void {
     this.finish.uniforms.time!.value = time % 10;
     this.composer.render();
+  }
+
+  /** Frees the GPU resources of the renderer and the postprocessing passes. The scene is not touched. */
+  dispose(): void {
+    this.composer.dispose();
+    this.bloom.dispose();
+    this.finish.dispose();
+    this.renderer.dispose();
   }
 }

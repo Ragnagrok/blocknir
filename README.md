@@ -99,6 +99,8 @@ audio.play((sfx) => sfx.step('stone'));
 | `ragnagrok-engine/kit` | `Joystick`, `Dialogue`, `Director`, `Actor`, `SaveSlot`. |
 | `ragnagrok-engine/paint` | `VoxelCanvas` and noise helpers for procedural models, and `createHumanoid`, a parametric voxel character (skin, hair, clothes, glasses, beard, silhouette) rigged with idle, walk, inspect and talk clips. |
 | `ragnagrok-engine/blocks` | A block-based programming language for kids and its interpreter, with the worlds programs run in: a grid with a robot (items, lamps, arrows, walls, level-defined actions), a drawing turtle, and a tick-based realtime arena with scripted actors. Levels, goals and execution traces are plain JSON; `check(level, program)` tests a program on every board and says why it fails, in Spanish by default. No DOM, no three.js. See [`src/blocks/README.md`](src/blocks/README.md). |
+| `ragnagrok-engine/blocks-ui` | `BlockEditor`: a touch-friendly block editor for that language (drag, tap or keyboard), with live block count against the level's limit, highlighting of the running block, error bubbles, undo and light/dark themes. Pure DOM, no framework. |
+| `ragnagrok-engine/blocks-3d` | `BoardView`: renders and animates grid, turtle and realtime worlds in voxels from an execution trace, with skins to give each game its own characters, items and floors. Ships a default skin. |
 
 Positions are in meters, model sizes in voxels, angles in radians. A heading of 0 faces +z.
 [`GLOSSARY.md`](GLOSSARY.md) maps the engine's names to the Spanish ones it had inside the games.

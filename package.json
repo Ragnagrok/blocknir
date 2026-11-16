@@ -40,6 +40,14 @@
     "./blocks": {
       "types": "./dist/blocks/index.d.ts",
       "import": "./dist/blocks/index.js"
+    },
+    "./blocks-ui": {
+      "types": "./dist/blocks-ui/index.d.ts",
+      "import": "./dist/blocks-ui/index.js"
+    },
+    "./blocks-3d": {
+      "types": "./dist/blocks-3d/index.d.ts",
+      "import": "./dist/blocks-3d/index.js"
     }
   },
   "files": [
