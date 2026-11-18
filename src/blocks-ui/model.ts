@@ -22,6 +22,7 @@ import {
   type Program,
   type Statement,
   type Value,
+  type ValueType,
 } from '../blocks/index.js';
 import { hole, paramSpecOf, type Schema } from './schema.js';
 
@@ -69,6 +70,8 @@ export type Refusal =
   | 'edge'
   /** The slot is a fixed part of a preset block (the `360` of `360 ÷ ( )`). */
   | 'fixed'
+  /** Blocks add to the variable (`change`), so it has to hold a number. */
+  | 'counted'
   | 'invalid';
 
 export type EditResult = { ok: true; id?: NodeId } | { ok: false; reason: Refusal };
@@ -710,20 +713,70 @@ export class EditorModel {
     return this.edit('variable', id, (p) => {
       const n = nodeIndex(p).get(id);
       if (!n || !('kind' in n)) return no('notFound');
-      if (n.kind === 'set' || n.kind === 'change') n.variable = v;
-      else if (n.kind === 'var') n.name = v;
-      else return no('invalid');
+      if (n.kind === 'change') {
+        if (!this.schema.countable(v)) return no('type');
+        n.variable = v;
+      } else if (n.kind === 'set') {
+        n.variable = v;
+        // The value it had may not fit the new variable: it starts again.
+        if (!this.schema.fits(this.schema.returns(n.value), this.schema.variableType(v))) n.value = this.schema.setValue(this.newIdFor(p), v);
+      } else if (n.kind === 'var') {
+        n.name = v;
+        const slot = locateExpr(p, id);
+        const parent = slot ? nodeIndex(p).get(slot.parent) : undefined;
+        const spec = parent && 'kind' in parent ? this.schema.slots(parent)[slot!.slot] : undefined;
+        if (slot && spec && !this.schema.fits(this.schema.variableType(v), spec.type)) this.resetSlot(p, slot);
+      } else return no('invalid');
       return { ok: true, id };
     });
   }
 
-  /** Creates a variable (offered in the palette until it is used). */
-  addVariable(name: string): EditResult {
+  /** Creates a variable (offered in the palette until it is used), holding `type` if given. */
+  addVariable(name: string, type?: ValueType): EditResult {
     const v = name.trim();
     if (!v) return no('name');
     if (this.variables.includes(v)) return no('duplicateName');
-    return this.edit('addVariable', undefined, () => {
+    return this.edit('addVariable', undefined, (p) => {
       this.extraVars.push(v);
+      if (type && type !== 'any') p.variableTypes = { ...p.variableTypes, [v]: type };
+      else if (p.variableTypes?.[v]) delete p.variableTypes[v];
+      return OK;
+    });
+  }
+
+  /**
+   * Changes what a variable holds. Its `set` blocks whose value no longer fits start again, and so
+   * do the slots where it no longer fits. Refused (`counted`) while blocks add to it and the new
+   * type is not a number.
+   */
+  setVariableType(name: string, type: ValueType): EditResult {
+    if (this.schema.variableType(name) === type) return no('invalid');
+    if (type !== 'number' && type !== 'any') {
+      let counted = false;
+      walkProgram(this.current, (n) => {
+        if ('kind' in n && n.kind === 'change' && n.variable === name) counted = true;
+      });
+      if (counted) return no('counted');
+    }
+    return this.edit('variableType', undefined, (p) => {
+      const types = { ...p.variableTypes };
+      if (type === 'any') delete types[name];
+      else types[name] = type;
+      if (Object.keys(types).length) p.variableTypes = types;
+      else delete p.variableTypes;
+      const misfits: NodeId[] = [];
+      walkProgram(p, (n) => {
+        if (!('kind' in n)) return;
+        if (n.kind === 'set' && n.variable === name && !this.schema.fits(this.schema.returns(n.value), type)) n.value = this.schema.setValue(this.newIdFor(p), name);
+        const specs = this.schema.slots(n);
+        childExprs(n).forEach((c, j) => {
+          if (c.kind === 'var' && c.name === name && specs[j] && !this.schema.fits(type, specs[j]!.type)) misfits.push(c.id);
+        });
+      });
+      for (const use of misfits) {
+        const slot = locateExpr(p, use);
+        if (slot) this.resetSlot(p, slot);
+      }
       return OK;
     });
   }

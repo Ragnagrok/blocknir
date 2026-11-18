@@ -152,6 +152,8 @@ export const DEFAULT_LABELS: Labels = {
     recursionDepth: 'Hay procedimientos que se llaman entre sí demasiadas veces (más de {limit}).',
     paramCount: '"{name}" necesita {expected} datos y recibió {got}.',
     argType: '"{name}" esperaba {expected} en el hueco {position}.',
+    varType: 'La variable "{name}" guarda {expected}.',
+    'varType:name': 'La variable "{name}" guarda una palabra.',
     notBoolean: 'Acá va una pregunta que se conteste con sí o no.',
     notNumber: 'Acá va un número.',
     badCount: 'No se puede repetir {count} veces: tiene que ser un número entero, 0 o más.',

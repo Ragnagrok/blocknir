@@ -22,6 +22,7 @@ export type ErrorCode =
   | 'recursionDepth'
   | 'paramCount'
   | 'argType'
+  | 'varType'
   | 'notBoolean'
   | 'notNumber'
   | 'badCount'

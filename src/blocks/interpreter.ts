@@ -110,6 +110,8 @@ export interface ExecEnv<E> {
   realtime: boolean;
   stack: NodeId[];
   actor?: string;
+  /** What each variable holds (`Program.variableTypes`). */
+  varTypes?: Readonly<Record<string, ValueType>>;
 }
 
 interface Frame {
@@ -208,6 +210,8 @@ function* execStmt<E>(env: ExecEnv<E>, s: Statement, frame: Frame): Generator<Si
     }
     case 'set': {
       const v = evalExpr(env, s.value, frame);
+      const t = env.varTypes?.[s.variable];
+      if (t && !fitsType(v, t)) throw new BlockError('varType', { name: s.variable, expected: env.labels.types[t], key: t }, s.value.id);
       env.vars.set(s.variable, v);
       yield step(env, { node: s.id, kind: 'set', events: [], variable: s.variable, value: v });
       return;
@@ -423,6 +427,7 @@ export class Runner<E> {
       budget: { used: 0, limit: options.stepLimit ?? DEFAULT_STEP_LIMIT },
       realtime: false,
       stack: [],
+      ...(program.variableTypes ? { varTypes: program.variableTypes } : {}),
     };
     this.gen = execBody(env, options.main ?? program.main);
   }

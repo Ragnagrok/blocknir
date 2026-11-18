@@ -239,6 +239,12 @@ export interface Program {
   main: Statement[];
   procedures?: Procedure[];
   handlers?: Handler[];
+  /**
+   * What each variable holds (missing: anything): `{ points: 'number', greeting: 'name', done:
+   * 'boolean' }`. Editors offer values of that type when setting it; setting it to a value of
+   * another type stops the run with `varType`.
+   */
+  variableTypes?: Record<string, ValueType>;
 }
 
 /** Any node with an id. */

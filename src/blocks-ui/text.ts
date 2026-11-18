@@ -32,6 +32,12 @@ export interface UiText {
    * picker shows these; the chip shows them without the article (`número`).
    */
   paramTypes: Record<string, string>;
+  /** Asks what a new variable holds (`{name}`). */
+  variableTypeTitle: string;
+  /** The variable picker's entry that changes what a variable holds (`{name}`). */
+  variableTypeMenu: string;
+  /** What a variable holds, by type: `number`, `name` (a word), `boolean`. */
+  variableTypes: Record<string, string>;
   deleteProcedure: string;
   deleteHandler: string;
   newVariable: string;
@@ -116,6 +122,14 @@ export const DEFAULT_TEXT: UiText = {
     'name:sound': 'Un sonido',
     'name:look': 'Un aspecto',
   },
+  variableTypeTitle: '¿Qué guarda “{name}”?',
+  variableTypeMenu: 'Qué guarda “{name}”',
+  variableTypes: {
+    number: 'Un número',
+    name: 'Una palabra',
+    boolean: 'Verdadero o falso',
+    any: 'Cualquier cosa',
+  },
   deleteProcedure: 'Borrar enseñanza',
   deleteHandler: 'Borrar evento',
   newVariable: 'Nueva variable…',
@@ -153,6 +167,7 @@ export const DEFAULT_TEXT: UiText = {
     name: 'Falta el nombre.',
     edge: 'No se puede mover más.',
     fixed: 'Esa parte del bloque viene fija.',
+    counted: 'Hay bloques que le suman a esa variable: tiene que guardar un número.',
     readOnly: 'Esperá a que termine.',
     notFound: 'No se pudo.',
     invalid: 'No se pudo.',
@@ -174,6 +189,7 @@ export function mergeText(over: DeepPartial<UiText> | undefined): UiText {
     groups: { ...DEFAULT_TEXT.groups, ...over.groups },
     refused: { ...DEFAULT_TEXT.refused, ...over.refused },
     paramTypes: { ...DEFAULT_TEXT.paramTypes, ...over.paramTypes },
+    variableTypes: { ...DEFAULT_TEXT.variableTypes, ...over.variableTypes },
   } as UiText;
 }
 

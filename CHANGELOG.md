@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.4
+
+Variables that say what they hold.
+
+- **blocks**: typed variables. `Program.variableTypes` (optional) says what each variable holds (a
+  number, a word: `name`, or true or false); a `set` with a value of another type stops with
+  `varType` (`'varType:name'` reads "guarda una palabra"). Programs without it work as before.
+- **blocks-ui**: creating a variable asks what it holds (`variableTypeTitle`, `variableTypes`);
+  the variable picker shows each one's type (`puntos · número`) and can change it
+  (`variableTypeMenu`, `EditorModel.setVariableType`, refused with `counted` while blocks add to
+  it). `set` offers values of the variable's type, the reporter fits only where its type goes and
+  `change` / `subtract` only use numbers. `addVariable(name, type?)`, `Schema.variableType`,
+  `variableTypes`, `setValue`, `countable`.
+
 ## 0.3.3
 
 Realtime games make room for their characters too.

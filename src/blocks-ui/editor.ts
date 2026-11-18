@@ -1231,16 +1231,24 @@ export class BlockEditor {
       await this.renameProcedure(id);
     } else if (field === 'var') {
       const n = this.model.node(id);
-      const current = n && 'kind' in n && (n.kind === 'set' || n.kind === 'change') ? n.variable : '';
+      const current = n && 'kind' in n ? (n.kind === 'set' || n.kind === 'change' ? n.variable : n.kind === 'var' ? n.name : '') : '';
+      // `change` adds numbers: only the variables that hold one.
+      const counting = !!n && 'kind' in n && n.kind === 'change';
+      const names = this.model.variables.filter((v) => !counting || this.schema.countable(v));
+      const extras = [{ id: 'new', label: t.newVariable }];
+      if (current) extras.push({ id: 'type', label: fmt(t.variableTypeMenu, { name: current }) });
       const r = await this.dialogs.picker({
         title: t.chooseVariable,
-        options: this.model.variables.map((v) => ({ label: v, value: v, pressed: v === current })),
-        extras: [{ id: 'new', label: t.newVariable }],
+        options: names.map((v) => ({ label: this.variableLabel(v), value: v, pressed: v === current })),
+        extras,
       });
       if (r?.type === 'value') this.result(this.model.setVariable(id, String(r.value)));
-      else if (r?.type === 'extra') {
-        const name = await this.askName(t.nameVariable, '', (v) => (this.model.variables.includes(v) ? t.refused.duplicateName ?? '' : null));
-        if (name && this.result(this.model.addVariable(name))) this.result(this.model.setVariable(id, name));
+      else if (r?.type === 'extra' && r.id === 'type') {
+        const type = await this.askVariableType(current, this.schema.variableType(current));
+        if (type) this.result(this.model.setVariableType(current, type));
+      } else if (r?.type === 'extra') {
+        const made = await this.createVariable(counting);
+        if (made) this.result(this.model.setVariable(id, made));
       }
     } else if (field === 'event') {
       const hd = this.model.program.handlers?.find((x) => x.id === id);
@@ -1345,8 +1353,38 @@ export class BlockEditor {
 
   private async newVariable(): Promise<void> {
     if (this.model.readOnly) return;
+    const name = await this.createVariable(false);
+    if (name) this.announce(fmt(this.text.added, { block: name }));
+  }
+
+  /**
+   * Asks a new variable's name and what it holds (only numbers when it is for a `change`), and
+   * creates it. Its name, or null when cancelled.
+   */
+  private async createVariable(numberOnly: boolean): Promise<string | null> {
     const name = await this.askName(this.text.nameVariable, '', (v) => (this.model.variables.includes(v) ? (this.text.refused.duplicateName ?? '') : null));
-    if (name) this.result(this.model.addVariable(name), fmt(this.text.added, { block: name }));
+    if (!name) return null;
+    const type = numberOnly ? 'number' : await this.askVariableType(name, null);
+    if (!type) return null;
+    return this.result(this.model.addVariable(name, type)) ? name : null;
+  }
+
+  /** Asks what a variable holds. Null when cancelled. */
+  private async askVariableType(name: string, current: ValueType | null): Promise<ValueType | null> {
+    const types = this.schema.variableTypes();
+    const r = await this.dialogs.picker({
+      title: fmt(this.text.variableTypeTitle, { name }),
+      options: types.map((t, i) => ({ label: this.text.variableTypes[t] ?? t, value: i, pressed: t === current })),
+    });
+    return r?.type === 'value' && typeof r.value === 'number' ? (types[r.value] ?? null) : null;
+  }
+
+  /** A variable with what it holds, for pickers: `puntos · número`. */
+  private variableLabel(v: string): string {
+    const t = this.schema.variableType(v);
+    if (t === 'any') return v;
+    const s = (this.text.variableTypes[t] ?? t).replace(/^(un|una)\s+/i, '');
+    return `${v} · ${s.charAt(0).toLowerCase()}${s.slice(1)}`;
   }
 
   // -------------------------------------------------------------------------------------------

@@ -443,6 +443,63 @@ describe('model: procedures, parameters and variables', () => {
     expect(model.putExpr(v, { parent: c.id, slot: 0 }).ok).toBe(true);
     expect(model.variables).toEqual(['vueltas', 'pasos']);
   });
+
+  it('typed variables: set offers values of that type, change only numbers, the reporter fits its type', () => {
+    const { model, schema, stmt, make } = setup();
+    expect(schema.variableTypes()).toEqual(['number', 'name', 'boolean']);
+    expect(model.addVariable('saludo', 'name').ok).toBe(true);
+    expect(model.addVariable('listo', 'boolean').ok).toBe(true);
+    expect(model.addVariable('pasos', 'number').ok).toBe(true);
+    expect(model.program.variableTypes).toEqual({ saludo: 'name', listo: 'boolean', pasos: 'number' });
+    // Set of a word: its slot takes a word, starts as a hole, and a number does not go in.
+    const s = stmt('variable:set');
+    model.insert(s);
+    expect(s.kind === 'set' && s.variable).toBe('saludo');
+    expect(s.kind === 'set' && isHole(s.value)).toBe(true);
+    expect(schema.slots(s)).toEqual([{ type: 'name', name: 'word' }]);
+    expect(schema.choices(schema.slots(s)[0]!)).toEqual([]);
+    expect(model.setValue({ parent: s.id, slot: 0 }, 3)).toEqual({ ok: false, reason: 'type' });
+    expect(model.setValue({ parent: s.id, slot: 0 }, 'hola').ok).toBe(true);
+    // Switching it to the number variable: the word does not fit, the value starts again at 0.
+    expect(model.setVariable(s.id, 'pasos').ok).toBe(true);
+    expect((model.program.main[0] as Extract<Statement, { kind: 'set' }>).value).toMatchObject({ kind: 'number', value: 0 });
+    // Change offers only numbers: its template uses `pasos`, and it refuses `saludo`.
+    const c = stmt('variable:change');
+    model.insert(c);
+    expect(c.kind === 'change' && c.variable).toBe('pasos');
+    expect(model.setVariable(c.id, 'saludo')).toEqual({ ok: false, reason: 'type' });
+    // The reporters give their type: `listo` goes in a condition, `saludo` does not go in Repetir.
+    const i = stmt('control:if');
+    model.insert(i);
+    expect(model.putExpr(make('var:listo'), { parent: i.id, slot: 0 }).ok).toBe(true);
+    const r = stmt('control:repeat');
+    model.insert(r);
+    expect(model.putExpr(make('var:saludo'), { parent: r.id, slot: 0 })).toEqual({ ok: false, reason: 'type' });
+    // `pasos` is counted, so it stays a number; `listo` becomes a word: the condition loses it.
+    expect(model.setVariableType('pasos', 'name')).toEqual({ ok: false, reason: 'counted' });
+    expect(model.setVariableType('listo', 'name').ok).toBe(true);
+    const cond = (model.program.main.find((x) => x.kind === 'if') as Extract<Statement, { kind: 'if' }>).condition;
+    expect(cond.kind).not.toBe('var');
+    model.undo();
+    expect(model.program.variableTypes?.listo).toBe('boolean');
+    // Saved and read back with its types.
+    const back = deserializeProgram(serializeProgram(model.getProgram(), { variables: model.createdVariables }));
+    expect(back?.program.variableTypes).toEqual({ saludo: 'name', listo: 'boolean', pasos: 'number' });
+    expect(analyze(model.getProgram(), catalogFor(lamps), lamps.toolbox)).toEqual([]);
+  });
+
+  it('typed variables: setting one to a value of another type stops the run', () => {
+    const program: Program = {
+      main: [{ id: 's', kind: 'set', variable: 'saludo', value: { id: 'v', kind: 'number', value: 3 } }],
+      variableTypes: { saludo: 'name' },
+    };
+    const r = runCase(lamps, program);
+    expect(r.error?.code).toBe('varType');
+    expect(r.error?.nodeId).toBe('v');
+    expect(r.error?.message).toBe('La variable "saludo" guarda una palabra.');
+    const ok = runCase(lamps, { ...program, main: [{ id: 's', kind: 'set', variable: 'saludo', value: { id: 'v', kind: 'name', value: 'hola' } }] });
+    expect(ok.error).toBeNull();
+  });
 });
 
 describe('model: par, handlers and saving', () => {

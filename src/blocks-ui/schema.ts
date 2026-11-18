@@ -12,6 +12,7 @@ import {
   labelsFor,
   mergeLabels,
   palette,
+  typeOfValue,
   walkProgram,
   type Catalog,
   type EventSpec,
@@ -170,8 +171,11 @@ export class Schema {
       case 'repeatUntil':
       case 'if':
         return [b];
-      case 'set':
-        return [any];
+      case 'set': {
+        const t = this.variableType(node.variable);
+        // A word is written, not chosen from the board's names.
+        return [t === 'name' ? { type: 'name', name: 'word' } : { type: t }];
+      }
       case 'change':
         return [n];
       case 'arith':
@@ -212,8 +216,39 @@ export class Schema {
       case 'param':
         return this.paramType(e.name);
       case 'var':
-        return 'any';
+        return this.variableType(e.name);
     }
+  }
+
+  /**
+   * What a variable holds: its type in the program (`variableTypes`), a number or a boolean when it
+   * is one of the level's shared variables that starts as one, otherwise `any`.
+   */
+  variableType(name: string): ValueType {
+    const t = this.program?.variableTypes?.[name];
+    if (t) return t;
+    if (this.level.world === 'realtime') {
+      const v = this.level.variables?.[name];
+      if (typeof v === 'number' || typeof v === 'boolean') return typeOfValue(v);
+    }
+    return 'any';
+  }
+
+  /** What a new variable can hold: a number (the default), a word, true or false. */
+  variableTypes(): ValueType[] {
+    return ['number', 'name', 'boolean'];
+  }
+
+  /** What a `set` of a variable starts with: 0 for numbers (and untyped ones), else a hole to fill. */
+  setValue(id: string, variable: string): Expr {
+    const t = this.variableType(variable);
+    return t === 'number' || t === 'any' ? { id, kind: 'number', value: 0 } : hole(id);
+  }
+
+  /** Whether `change` / `subtract` can use the variable (numbers and untyped ones). */
+  countable(variable: string): boolean {
+    const t = this.variableType(variable);
+    return t === 'number' || t === 'any';
   }
 
   /**
@@ -283,6 +318,7 @@ export class Schema {
     const level = this.level;
     const ch = level.toolbox.choices ?? {};
     if (hint === 'key') return [...(ch.keys ?? (level.world === 'realtime' ? (level.keys ?? []) : []))];
+    if (hint === 'word') return [];
     if (ch.names?.length) return [...ch.names];
     const found = new Set<string>();
     if (level.world === 'grid') {
@@ -365,9 +401,9 @@ export class Schema {
           break;
         }
         case 'variable': {
-          const first = ctx.variables[0];
+          const first = e.key === 'set' ? ctx.variables[0] : ctx.variables.find((v) => this.countable(v));
           if (e.key === 'var') {
-            for (const v of ctx.variables) out.push({ ...base, id: `var:${v}`, shape: 'reporter', returns: 'any', variable: v });
+            for (const v of ctx.variables) out.push({ ...base, id: `var:${v}`, shape: 'reporter', returns: this.variableType(v), variable: v });
           } else if (first !== undefined) {
             out.push({ ...base, id: `variable:${e.key}`, shape: 'stack', variable: first });
           }
@@ -435,7 +471,7 @@ export class Schema {
       case 'wait':
         return { id, kind: 'wait', ticks: this.emptyExpr(nextId(), { type: 'number', name: 'ticks' }, 'wait') };
       case 'set':
-        return { id, kind: 'set', variable: t.variable ?? '', value: { id: nextId(), kind: 'number', value: 0 } };
+        return { id, kind: 'set', variable: t.variable ?? '', value: this.setValue(nextId(), t.variable ?? '') };
       case 'change':
         return { id, kind: 'change', variable: t.variable ?? '', by: { id: nextId(), kind: 'number', value: 1 } };
       case 'subtract':

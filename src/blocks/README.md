@@ -95,6 +95,11 @@ Semantics worth knowing:
 - Variables are global to a program (step worlds) or per actor (realtime, except the level's shared
   `variables` such as `points`, `lives`). `change` on a missing variable starts it at 0; reading a
   variable never set is an error.
+- `Program.variableTypes` (optional) says what each variable holds: `{ points: 'number', greeting:
+  'name', done: 'boolean' }` (`name` is a word). A `set` with a value of another type stops with
+  `varType`; variables without a type hold anything. In `blocks-ui`, `EditorModel.addVariable(name,
+  type)` and `setVariableType`; `Schema.variableType(name)` (a realtime level's shared numbers count
+  as numbers), `Schema.variableTypes()`, and `change` only uses numbers.
 - `=` compares any values (numbers with a 1e-9 tolerance); `<` and friends need numbers. `/` is
   real division (`360 / 7` works); `%` is always non-negative.
 - In code, `blocks()` builds nodes with sequential ids:

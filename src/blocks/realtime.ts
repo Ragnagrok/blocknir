@@ -405,6 +405,7 @@ export class RealtimeGame {
       realtime: true,
       stack: [],
       actor: a.id,
+      ...(script.program.variableTypes ? { varTypes: script.program.variableTypes } : {}),
     };
     this.threads.push({ actor: a.id, key, gen: execBody(env, body), env, resumeAt, done: false });
   }
