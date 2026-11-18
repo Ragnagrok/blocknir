@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { describeValue, DEFAULT_LABELS, type ActorState, type GameStatus, type RealtimeEvent, type RealtimeSetup, type RealtimeState, type TickResult, type Value } from '../blocks/index.js';
 import { buildFloor, cellCenter, place, type Floor } from './assets.js';
 import { boardBounds, type Bounds } from './framing.js';
+import { asideSlots, roomFor, slots } from './layout.js';
 import { Bubble, clamp01, easeInOut, easeOutBack, headingOf, InstancedTemplate } from './pieces.js';
 import { Mover, type Stage, type StageContext } from './stage.js';
 import { resolveName, type ActorDef } from './skin.js';
@@ -43,6 +44,17 @@ interface Live {
   look: string | null;
 }
 
+/** An item standing on a tile of the arena. */
+interface Prop {
+  name: string;
+  x: number;
+  z: number;
+  /** Steps aside for a character (not `stay`, not `floor`). */
+  moves: boolean;
+  k: number;
+  away?: [number, number];
+}
+
 const DIRS: Record<string, [number, number]> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
 
 export class RealtimeStage implements Stage {
@@ -53,7 +65,9 @@ export class RealtimeStage implements Stage {
 
   private floor: Floor;
   private readonly floorOf: () => Floor;
-  private props: InstancedTemplate[] = [];
+  private props = new Map<string, InstancedTemplate>();
+  private propList: Prop[] = [];
+  private propKey = '';
   private actors = new Map<string, Live>();
   private age = 0;
   private ended: Exclude<GameStatus, 'running'> | null = null;
@@ -72,14 +86,12 @@ export class RealtimeStage implements Stage {
     const skin = ctx.assets.skin;
     const isTerrain = (name: string): boolean => resolveName(name, (k) => Object.prototype.hasOwnProperty.call(skin.terrain, k), skin.aliases).key !== null;
     // Tiles that are not floors (a `star`, a `door`) stand on the default floor as items.
-    const props = new Map<string, THREE.Matrix4[]>();
     for (const [at, name] of tiles) {
       if (isTerrain(name)) continue;
       const [x, y] = at.split(',').map(Number) as [number, number];
       const [cx, cz] = cellCenter(x, y, width, height);
-      const list = props.get(name) ?? [];
-      list.push(place(cx, 0, cz));
-      props.set(name, list);
+      const def = ctx.assets.item(name).def;
+      this.propList.push({ name, x: cx, z: cz, moves: !def.stay && !def.floor, k: 0 });
     }
     this.floorOf = () =>
       buildFloor(
@@ -94,12 +106,13 @@ export class RealtimeStage implements Stage {
       );
     this.floor = this.floorOf();
     this.root.add(this.floor.group);
-    for (const [name, list] of props) {
-      const it = new InstancedTemplate(ctx.assets.item(name).object);
-      it.set(list);
+    for (const p of this.propList) {
+      if (this.props.has(p.name)) continue;
+      const it = new InstancedTemplate(ctx.assets.item(p.name).object);
       this.root.add(it.group);
-      this.props.push(it);
+      this.props.set(p.name, it);
     }
+    this.placeProps();
     this.reset(state);
   }
 
@@ -345,14 +358,61 @@ export class RealtimeStage implements Stage {
       if (a.def.projectile) m.visual.object.rotation.z = time * 6;
       a.bubble?.update(dt, m.top());
     }
+    this.makeRoom();
     this.floor.waves.position.y = Math.sin(time * 1.6) * 0.025;
+  }
+
+  /**
+   * Items on the tiles step aside for the characters walking by, like on the grid board: toward a
+   * corner of their cell, away from where the nearest one comes in, and back once it leaves.
+   */
+  private makeRoom(): void {
+    const walkers: Mover[] = [];
+    for (const a of this.actors.values()) if (!a.def.projectile && !a.def.fly && a.gone < 0) walkers.push(a.mover);
+    let key = '';
+    for (const p of this.propList) {
+      if (!p.moves) continue;
+      let best: Mover | null = null;
+      let d = Infinity;
+      for (const w of walkers) {
+        const dd = Math.hypot(w.x - p.x, w.z - p.z);
+        if (dd < d) [best, d] = [w, dd];
+      }
+      const r = best ? roomFor(best.x - p.x, best.z - p.z, p.away) : undefined;
+      p.k = r?.k ?? 0;
+      p.away = r?.away;
+      if (r) key += `${p.x},${p.z}:${p.k.toFixed(3)} `;
+    }
+    if (key !== this.propKey) {
+      this.propKey = key;
+      this.placeProps();
+    }
+  }
+
+  private placeProps(): void {
+    const lists = new Map<string, THREE.Matrix4[]>();
+    const base = slots(1).scale;
+    for (const p of this.propList) {
+      let [x, z, scale] = [p.x, p.z, 1];
+      const aside = p.k > 0 && p.away ? asideSlots(1, p.away) : null;
+      if (aside) {
+        const [tx, tz] = aside.at[0]!;
+        x += tx * p.k;
+        z += tz * p.k;
+        scale += (aside.scale / base - 1) * p.k;
+      }
+      const list = lists.get(p.name) ?? [];
+      list.push(place(x, 0, z, 0, scale));
+      lists.set(p.name, list);
+    }
+    for (const [name, it] of this.props) it.set(lists.get(name) ?? []);
   }
 
   dispose(): void {
     for (const a of this.actors.values()) this.remove(a);
     this.actors.clear();
     this.floor.dispose();
-    for (const p of this.props) p.dispose();
+    for (const p of this.props.values()) p.dispose();
     this.root.clear();
     void this.time;
   }

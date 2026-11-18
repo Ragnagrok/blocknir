@@ -7,7 +7,7 @@ import { boardBounds, corners, distanceForPixels, followBox, frameBox, pitchFor,
 import { cameraModeOf } from './board-view.js';
 import * as M from './models.js';
 import { figureCharacter } from './pieces.js';
-import { layoutCell } from './layout.js';
+import { layoutCell, roomFor } from './layout.js';
 import { actorOf, colorOf, extendSkin, itemContext, mergeSkin, resolveName, terrainOf } from './skin.js';
 import { Mover, StepShow } from './stage.js';
 import { DEFAULT_TIMING, gridStepDuration, parseSpeed, Playhead, turtleStepDuration } from './timeline.js';
@@ -261,6 +261,19 @@ describe('cell layout', () => {
     // A hammock the character lies in stays put.
     const hammock = layoutCell([{ name: 'hammock', count: 1, stay: true }], undefined, { k: 1, away: [0, -1] }).placements[0]!;
     expect([hammock.x, hammock.z, hammock.scale]).toEqual([center.x, center.z, center.scale]);
+  });
+
+  it('makes room as a character comes near, away from where it comes in, and keeps the side', () => {
+    expect(roomFor(1, 0)).toBeUndefined();
+    expect(roomFor(0, 0)).toEqual({ k: 1, away: [0, -1] });
+    // Coming in from the right (x > 0): the items go left.
+    const near = roomFor(0.7, 0.1)!;
+    expect(near.away).toEqual([-1, 0]);
+    expect(near.k).toBeGreaterThan(0);
+    expect(near.k).toBeLessThan(1);
+    // The side chosen first is kept while the character walks on across the cell.
+    expect(roomFor(-0.3, 0, near.away)!.away).toEqual([-1, 0]);
+    expect(roomFor(0.2, 0)!.k).toBe(1);
   });
 });
 

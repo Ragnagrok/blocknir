@@ -79,6 +79,21 @@ export function asideSlots(n: number, away: readonly [number, number]): { at: Ar
   return null;
 }
 
+/**
+ * How much a cell's items make room for a character `dx, dz` meters from the cell's center: 1 on
+ * the cell, 0 a cell away, eased between (undefined: no room). `away` is the side chosen earlier,
+ * kept while the character is near; without one, the side away from where it comes in (already on
+ * the cell: the back).
+ */
+export function roomFor(dx: number, dz: number, away?: readonly [number, number]): Room | undefined {
+  const d = Math.hypot(dx, dz);
+  const t = Math.min(1, Math.max(0, (1 - d) / 0.4));
+  const k = t * t * (3 - 2 * t);
+  if (k <= 0) return undefined;
+  if (away) return { k, away: [away[0], away[1]] };
+  return { k, away: d < 0.05 ? [0, -1] : Math.abs(dx) > Math.abs(dz) ? [-Math.sign(dx), 0] : [0, -Math.sign(dz)] };
+}
+
 const lerp = (a: number, b: number, k: number): number => a + (b - a) * k;
 
 /**

@@ -73,6 +73,6 @@ export {
   type FramingOptions,
   type Vec3,
 } from './framing.js';
-export { layoutCell, type CellEntry, type Placement } from './layout.js';
+export { asideSlots, layoutCell, roomFor, type CellEntry, type Placement, type Room } from './layout.js';
 export { DEFAULT_TIMING, gridStepDuration, parseSpeed, Playhead, turtleStepDuration, type Timing } from './timeline.js';
 export type { RealtimeHud } from './realtime-stage.js';

@@ -1,6 +1,6 @@
 {
   "name": "ragnagrok-engine",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Voxel engine for the web: chunked voxel meshing with ambient occlusion, rigged voxel figures, fixed cameras, collision and pathfinding, a synthesized audio engine and a browser editor.",
   "license": "MIT",
   "type": "module",

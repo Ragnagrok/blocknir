@@ -18,7 +18,7 @@ import {
 } from '../blocks/index.js';
 import { buildFloor, cellCenter, place, type Floor } from './assets.js';
 import { boardBounds, type Bounds } from './framing.js';
-import { layoutCell, type CellEntry, type Placement, type Room } from './layout.js';
+import { layoutCell, roomFor, type CellEntry, type Placement, type Room } from './layout.js';
 import { angleDelta, badgeTexture, copyObject, Bubble, clamp01, disposeObject, easeInOut, easeOut, easeOutBack, headingOf, InstancedTemplate, ScreenSprite, span } from './pieces.js';
 import { labelSprite } from './default-skin.js';
 import { Mover, StepShow, type Beat, type StageContext, type StepStage } from './stage.js';
@@ -710,24 +710,11 @@ export class GridStage implements StepStage<GridEvent> {
    */
   private roomAt(x: number, y: number): Room | undefined {
     const [cx, , cz] = this.cell(x, y);
-    const m = this.mover;
-    const dx = m.x - cx;
-    const dz = m.z - cz;
-    const d = Math.hypot(dx, dz);
-    const t = clamp01((1 - d) / 0.4);
-    const k = t * t * (3 - 2 * t);
     const i = x + y * this.state.width;
-    if (k <= 0) {
-      this.away.delete(i);
-      return undefined;
-    }
-    let away = this.away.get(i);
-    if (!away) {
-      // Came in from a side: the items go to the other one. Already on the cell: to the back.
-      away = d < 0.05 ? [0, -1] : Math.abs(dx) > Math.abs(dz) ? [-Math.sign(dx), 0] : [0, -Math.sign(dz)];
-      this.away.set(i, away);
-    }
-    return { k, away };
+    const r = roomFor(this.mover.x - cx, this.mover.z - cz, this.away.get(i));
+    if (r) this.away.set(i, r.away);
+    else this.away.delete(i);
+    return r;
   }
 
   /** The room of the cells around the character that have items to move, rounded (changes trigger a rebuild). */

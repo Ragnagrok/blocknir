@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.3
+
+Realtime games make room for their characters too.
+
+- **blocks-3d**: realtime games make room too. Items standing on arena tiles slide to a corner of
+  their cell while a walking actor (the player or another, not a flying one or a shot) goes
+  through, and slide back after it. `roomFor(dx, dz, away?)` is the rule both boards share; it is
+  exported now, with `asideSlots` and `Room` (named in 0.3.2 but missing from the index).
+
 ## 0.3.2
 
 Objects that make room for the robot, and procedures whose parameters say what goes in them.
