@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.5
+
+Blocks that fit together.
+
+- **blocks-ui**: blocks fit together. Stacked blocks touch, with a tab under each one that sits in
+  the notch on top of the next (also in the palette and in `renderProgram`); a C block's arm, top
+  and foot hug the blocks inside, with their own tab and notches. The notch is cut from a paint
+  layer under the block, so the running, selected and error outlines keep their shape. CSS
+  variables `--rbk-tab-x`, `--rbk-tab-w`, `--rbk-tab-h`, `--rbk-tab-in`, `--rbk-arm`,
+  `--rbk-corner`.
+
 ## 0.3.4
 
 Variables that say what they hold.
