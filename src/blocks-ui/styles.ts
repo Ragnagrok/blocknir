@@ -73,13 +73,6 @@ export const CSS = `
   --rbk-font-size: 16px;
   --rbk-hit: 48px;
   --rbk-radius: 12px;
-  /* Stacked blocks fit together: a tab under each block, the matching notch on top of the next. */
-  --rbk-corner: 6px;
-  --rbk-tab-x: 18px;
-  --rbk-tab-w: 28px;
-  --rbk-tab-h: 8px;
-  --rbk-tab-in: 6px;
-  --rbk-arm: 18px;
   --rbk-palette-width: 300px;
   position: relative;
   display: flex;
@@ -154,6 +147,7 @@ export const CSS = `
 /* Narrow: a block in the palette moves the moment the finger does (no scrolling under it). */
 .rbk-narrow .rbk-pitem { touch-action: none; }
 .rbk-pitem.rbk-disabled { opacity: 0.45; cursor: not-allowed; }
+.rbk-pitem .rbk-stmt::after { display: none; }
 .rbk-newvar { min-height: 44px; }
 .rbk-trash { position: absolute; inset: 0; z-index: 6; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; text-align: center; background: color-mix(in srgb, var(--rbk-surface) 90%, var(--rbk-error)); border: 3px dashed var(--rbk-error); color: var(--rbk-error); font-weight: 800; font-size: 18px; }
 .rbk-drag-ws .rbk-trash { display: flex; }
@@ -164,13 +158,11 @@ export const CSS = `
 .rbk-script { margin: 0 0 18px; padding: 10px; border-radius: 18px; background: var(--rbk-card); max-width: 100%; }
 .rbk-list { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 /* Gaps sit under the blocks: their tall hit area (40px+) shows beside the blocks, never over them. */
-.rbk-gap { position: relative; z-index: 2; align-self: stretch; height: 0; border-radius: 8px; cursor: pointer; outline: none; }
+.rbk-gap { position: relative; z-index: 2; align-self: stretch; height: 8px; border-radius: 8px; cursor: pointer; outline: none; }
 .rbk-gap::before { content: ""; position: absolute; left: 0; right: 0; top: -18px; bottom: -18px; }
 .rbk-list > .rbk-stmt, .rbk-list > .rbk-bubble { z-index: 3; }
 .rbk-hat, .rbk-stmt > .rbk-row, .rbk-stmt > .rbk-foot, .rbk-stmt > .rbk-mouth > .rbk-arm { position: relative; z-index: 3; }
 .rbk-gap.rbk-end { height: 24px; }
-/* Inside a C block the last block meets the foot: the end gap only keeps its tap area. */
-.rbk-mouth .rbk-gap.rbk-end:not(.rbk-cursor) { height: 0; }
 .rbk-gap.rbk-end::before { bottom: -8px; }
 .rbk-gap.rbk-empty { height: auto; min-height: 44px; margin: 2px 0; display: flex; align-items: center; padding: 0 12px; border: 2px dashed var(--rbk-border); color: var(--rbk-muted); font-size: 14px; font-weight: 700; }
 .rbk-gap.rbk-empty::before { top: -4px; bottom: -4px; }
@@ -189,30 +181,16 @@ export const CSS = `
 .rbk-small { font-size: 13px; opacity: 0.9; }
 .rbk-name { font-weight: 800; }
 .rbk-pname { font-size: 13px; font-weight: 700; opacity: 0.92; }
-/* The tab also covers the block's darker bottom edge where it starts, and carries that edge on its
-   own bottom: block and tab read as one piece. */
-.rbk-stmt::after, .rbk-hat::after, .rbk-mouth::before { content: ""; position: absolute; z-index: 4; left: var(--rbk-tab-x); bottom: calc(-1 * var(--rbk-tab-h)); width: var(--rbk-tab-w); height: calc(var(--rbk-tab-h) + 3px); background: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)) bottom / 100% 3px no-repeat, var(--rbk-cat); clip-path: polygon(0 0, 100% 0, 100% 3px, calc(100% - var(--rbk-tab-in)) 100%, var(--rbk-tab-in) 100%, 0 3px); }
-/* The notch: the block's paint (a layer under its content) has a hole where the tab above fits.
-   Outlines (running, selected, errors) stay on the block itself, so the mask never cuts them. */
-.rbk-stmt > .rbk-row, .rbk-stmt > .rbk-foot { --rbk-nx: var(--rbk-tab-x); background: transparent; box-shadow: none; border-radius: var(--rbk-corner); }
-.rbk-stmt > .rbk-mid, .rbk-stmt > .rbk-foot { --rbk-nx: calc(var(--rbk-arm) + var(--rbk-tab-x)); }
-/* The paint reaches 1px up, under the block above: no hairline of background between two blocks
-   that land on half pixels. */
-.rbk-stmt > .rbk-row::before, .rbk-stmt > .rbk-foot::before { content: ""; position: absolute; inset: -1px 0 0; z-index: -1; border-radius: inherit; background: var(--rbk-cat); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2), inset 0 0 0 1px var(--rbk-block-edge);
-  -webkit-mask: linear-gradient(#000 0 0) 0 var(--rbk-tab-h) / 100% calc(100% - var(--rbk-tab-h)) no-repeat, linear-gradient(#000 0 0) 0 0 / var(--rbk-nx) var(--rbk-tab-h) no-repeat, linear-gradient(#000 0 0) calc(var(--rbk-nx) + var(--rbk-tab-w)) 0 / 100% var(--rbk-tab-h) no-repeat, linear-gradient(to top right, #000 50%, transparent 50%) var(--rbk-nx) 0 / var(--rbk-tab-in) var(--rbk-tab-h) no-repeat, linear-gradient(to top left, #000 50%, transparent 50%) calc(var(--rbk-nx) + var(--rbk-tab-w) - var(--rbk-tab-in)) 0 / var(--rbk-tab-in) var(--rbk-tab-h) no-repeat;
-  mask: linear-gradient(#000 0 0) 0 var(--rbk-tab-h) / 100% calc(100% - var(--rbk-tab-h)) no-repeat, linear-gradient(#000 0 0) 0 0 / var(--rbk-nx) var(--rbk-tab-h) no-repeat, linear-gradient(#000 0 0) calc(var(--rbk-nx) + var(--rbk-tab-w)) 0 / 100% var(--rbk-tab-h) no-repeat, linear-gradient(to top right, #000 50%, transparent 50%) var(--rbk-nx) 0 / var(--rbk-tab-in) var(--rbk-tab-h) no-repeat, linear-gradient(to top left, #000 50%, transparent 50%) calc(var(--rbk-nx) + var(--rbk-tab-w) - var(--rbk-tab-in)) 0 / var(--rbk-tab-in) var(--rbk-tab-h) no-repeat; }
-.rbk-hat > .rbk-row { min-height: 54px; border-radius: 22px 22px var(--rbk-corner) var(--rbk-corner); padding-top: 9px; }
+.rbk-stmt::after, .rbk-hat::after { content: ""; position: absolute; z-index: 1; left: 20px; bottom: -7px; width: 26px; height: 8px; border-radius: 0 0 8px 8px; background: var(--rbk-cat); box-shadow: 0 1px 0 var(--rbk-block-edge); }
+.rbk-hat > .rbk-row { min-height: 54px; border-radius: 22px 22px var(--rbk-radius) var(--rbk-radius); padding-top: 9px; }
 .rbk-main-hat .rbk-icon { flex: none; }
-.rbk-c > .rbk-row:first-child { border-radius: var(--rbk-corner) var(--rbk-corner) var(--rbk-corner) 0; }
-/* The C's mouth: the arm on the left, a tab under the top for the first block inside, which sits
-   right against the arm, the top and the foot. */
-.rbk-mouth { position: relative; display: flex; min-height: 44px; }
-.rbk-mouth::before { top: -3px; bottom: auto; left: calc(var(--rbk-arm) + var(--rbk-tab-x)); }
-.rbk-arm { flex: none; width: var(--rbk-arm); background: var(--rbk-cat); box-shadow: inset 1px 0 0 var(--rbk-block-edge); }
-.rbk-mouth > .rbk-list { flex: 1; padding: 0; }
+.rbk-c > .rbk-row:first-child { border-radius: var(--rbk-radius) var(--rbk-radius) var(--rbk-radius) 4px; }
+.rbk-mouth { display: flex; min-height: 44px; }
+.rbk-arm { flex: none; width: 18px; background: var(--rbk-cat); box-shadow: -1px 0 0 var(--rbk-block-edge); }
+.rbk-mouth > .rbk-list { flex: 1; padding: 6px 4px 6px 8px; }
 .rbk-preview-list { min-width: 60px; min-height: 22px; }
-.rbk-stmt > .rbk-mid { border-radius: 0 var(--rbk-corner) var(--rbk-corner) 0; min-height: 40px; }
-.rbk-stmt > .rbk-foot { height: 22px; width: 100%; min-width: 96px; border-radius: 0 var(--rbk-corner) var(--rbk-corner) var(--rbk-corner); }
+.rbk-mid { border-radius: 4px var(--rbk-radius) var(--rbk-radius) 4px; min-height: 40px; }
+.rbk-foot { height: 20px; width: 100%; min-width: 96px; background: var(--rbk-cat); border-radius: 4px var(--rbk-radius) var(--rbk-radius) var(--rbk-radius); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2), 0 0 0 1px var(--rbk-block-edge); }
 
 .rbk-rep { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 40px; max-width: 100%; padding: 3px 14px; border-radius: 999px; background: var(--rbk-cat); color: var(--rbk-on-block); font-weight: 700; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.22), 0 0 0 1px var(--rbk-block-edge); touch-action: pan-y pinch-zoom; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: grab; outline: none; }
 .rbk-bool { border-radius: 6px; padding: 3px 22px; clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 16px 100%, 0 50%); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.22); }
@@ -309,8 +287,7 @@ export const CSS = `
 .rbk-static-small { --rbk-font-size: 14px; --rbk-hit: 38px; --rbk-radius: 10px; }
 .rbk-static .rbk-script { margin: 0 0 10px; padding: 0; background: transparent; }
 .rbk-static .rbk-script:last-child { margin-bottom: 0; }
-.rbk-static .rbk-gap { height: 0; pointer-events: none; }
-.rbk-static .rbk-mouth { min-height: 26px; }
+.rbk-static .rbk-gap { height: 3px; pointer-events: none; }
 .rbk-static .rbk-gap::before { display: none; }
 .rbk-static .rbk-gap.rbk-end { height: 0; }
 .rbk-static .rbk-gap.rbk-empty { min-height: 26px; padding: 0; font-size: 0; }

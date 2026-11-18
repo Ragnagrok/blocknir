@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.7
+
+Back to the blocks of 0.3.4.
+
+- **blocks-ui**: back to the 0.3.4 look: stacked blocks with a little space between them and no
+  notches. The fitted look (0.3.5, 0.3.6) read worse.
+
 ## 0.3.6
 
 Cleaner joints between blocks.
