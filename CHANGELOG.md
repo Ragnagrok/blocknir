@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.6
+
+Cleaner joints between blocks.
+
+- **blocks-ui**: smoother joints. The tab covers the block's darker bottom edge where it starts and
+  carries that edge itself, so block and tab read as one piece; a block's paint reaches 1px under
+  the block above, so no hairline of background shows between blocks on half pixels; the hat's
+  bottom corners match the blocks under it.
+- **blocks-ui**: fixed: the "next block" caret inside a C block overlapped the C's foot.
+
 ## 0.3.5
 
 Blocks that fit together.

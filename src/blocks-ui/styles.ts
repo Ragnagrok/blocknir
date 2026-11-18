@@ -170,7 +170,7 @@ export const CSS = `
 .rbk-hat, .rbk-stmt > .rbk-row, .rbk-stmt > .rbk-foot, .rbk-stmt > .rbk-mouth > .rbk-arm { position: relative; z-index: 3; }
 .rbk-gap.rbk-end { height: 24px; }
 /* Inside a C block the last block meets the foot: the end gap only keeps its tap area. */
-.rbk-mouth .rbk-gap.rbk-end { height: 0; }
+.rbk-mouth .rbk-gap.rbk-end:not(.rbk-cursor) { height: 0; }
 .rbk-gap.rbk-end::before { bottom: -8px; }
 .rbk-gap.rbk-empty { height: auto; min-height: 44px; margin: 2px 0; display: flex; align-items: center; padding: 0 12px; border: 2px dashed var(--rbk-border); color: var(--rbk-muted); font-size: 14px; font-weight: 700; }
 .rbk-gap.rbk-empty::before { top: -4px; bottom: -4px; }
@@ -189,21 +189,25 @@ export const CSS = `
 .rbk-small { font-size: 13px; opacity: 0.9; }
 .rbk-name { font-weight: 800; }
 .rbk-pname { font-size: 13px; font-weight: 700; opacity: 0.92; }
-.rbk-stmt::after, .rbk-hat::after, .rbk-mouth::before { content: ""; position: absolute; z-index: 1; left: var(--rbk-tab-x); bottom: calc(-1 * var(--rbk-tab-h)); width: var(--rbk-tab-w); height: var(--rbk-tab-h); background: var(--rbk-cat); clip-path: polygon(0 0, 100% 0, calc(100% - var(--rbk-tab-in)) 100%, var(--rbk-tab-in) 100%); }
+/* The tab also covers the block's darker bottom edge where it starts, and carries that edge on its
+   own bottom: block and tab read as one piece. */
+.rbk-stmt::after, .rbk-hat::after, .rbk-mouth::before { content: ""; position: absolute; z-index: 4; left: var(--rbk-tab-x); bottom: calc(-1 * var(--rbk-tab-h)); width: var(--rbk-tab-w); height: calc(var(--rbk-tab-h) + 3px); background: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)) bottom / 100% 3px no-repeat, var(--rbk-cat); clip-path: polygon(0 0, 100% 0, 100% 3px, calc(100% - var(--rbk-tab-in)) 100%, var(--rbk-tab-in) 100%, 0 3px); }
 /* The notch: the block's paint (a layer under its content) has a hole where the tab above fits.
    Outlines (running, selected, errors) stay on the block itself, so the mask never cuts them. */
 .rbk-stmt > .rbk-row, .rbk-stmt > .rbk-foot { --rbk-nx: var(--rbk-tab-x); background: transparent; box-shadow: none; border-radius: var(--rbk-corner); }
 .rbk-stmt > .rbk-mid, .rbk-stmt > .rbk-foot { --rbk-nx: calc(var(--rbk-arm) + var(--rbk-tab-x)); }
-.rbk-stmt > .rbk-row::before, .rbk-stmt > .rbk-foot::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--rbk-cat); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2), inset 0 0 0 1px var(--rbk-block-edge);
+/* The paint reaches 1px up, under the block above: no hairline of background between two blocks
+   that land on half pixels. */
+.rbk-stmt > .rbk-row::before, .rbk-stmt > .rbk-foot::before { content: ""; position: absolute; inset: -1px 0 0; z-index: -1; border-radius: inherit; background: var(--rbk-cat); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2), inset 0 0 0 1px var(--rbk-block-edge);
   -webkit-mask: linear-gradient(#000 0 0) 0 var(--rbk-tab-h) / 100% calc(100% - var(--rbk-tab-h)) no-repeat, linear-gradient(#000 0 0) 0 0 / var(--rbk-nx) var(--rbk-tab-h) no-repeat, linear-gradient(#000 0 0) calc(var(--rbk-nx) + var(--rbk-tab-w)) 0 / 100% var(--rbk-tab-h) no-repeat, linear-gradient(to top right, #000 50%, transparent 50%) var(--rbk-nx) 0 / var(--rbk-tab-in) var(--rbk-tab-h) no-repeat, linear-gradient(to top left, #000 50%, transparent 50%) calc(var(--rbk-nx) + var(--rbk-tab-w) - var(--rbk-tab-in)) 0 / var(--rbk-tab-in) var(--rbk-tab-h) no-repeat;
   mask: linear-gradient(#000 0 0) 0 var(--rbk-tab-h) / 100% calc(100% - var(--rbk-tab-h)) no-repeat, linear-gradient(#000 0 0) 0 0 / var(--rbk-nx) var(--rbk-tab-h) no-repeat, linear-gradient(#000 0 0) calc(var(--rbk-nx) + var(--rbk-tab-w)) 0 / 100% var(--rbk-tab-h) no-repeat, linear-gradient(to top right, #000 50%, transparent 50%) var(--rbk-nx) 0 / var(--rbk-tab-in) var(--rbk-tab-h) no-repeat, linear-gradient(to top left, #000 50%, transparent 50%) calc(var(--rbk-nx) + var(--rbk-tab-w) - var(--rbk-tab-in)) 0 / var(--rbk-tab-in) var(--rbk-tab-h) no-repeat; }
-.rbk-hat > .rbk-row { min-height: 54px; border-radius: 22px 22px var(--rbk-radius) var(--rbk-radius); padding-top: 9px; }
+.rbk-hat > .rbk-row { min-height: 54px; border-radius: 22px 22px var(--rbk-corner) var(--rbk-corner); padding-top: 9px; }
 .rbk-main-hat .rbk-icon { flex: none; }
 .rbk-c > .rbk-row:first-child { border-radius: var(--rbk-corner) var(--rbk-corner) var(--rbk-corner) 0; }
 /* The C's mouth: the arm on the left, a tab under the top for the first block inside, which sits
    right against the arm, the top and the foot. */
 .rbk-mouth { position: relative; display: flex; min-height: 44px; }
-.rbk-mouth::before { top: 0; bottom: auto; left: calc(var(--rbk-arm) + var(--rbk-tab-x)); z-index: 4; }
+.rbk-mouth::before { top: -3px; bottom: auto; left: calc(var(--rbk-arm) + var(--rbk-tab-x)); }
 .rbk-arm { flex: none; width: var(--rbk-arm); background: var(--rbk-cat); box-shadow: inset 1px 0 0 var(--rbk-block-edge); }
 .rbk-mouth > .rbk-list { flex: 1; padding: 0; }
 .rbk-preview-list { min-width: 60px; min-height: 22px; }
