@@ -12,7 +12,7 @@
 import { ensureIds, type Level, type Program, type Statement } from '../blocks/index.js';
 import type { LabelOverrides } from '../blocks/index.js';
 import { h } from './dom.js';
-import type { Theme } from './editor.js';
+import type { Joints, Theme } from './editor.js';
 import { EditorModel } from './model.js';
 import { Renderer } from './render.js';
 import { Schema } from './schema.js';
@@ -30,13 +30,15 @@ export interface StaticBlocksOptions {
   hat?: boolean;
   /** Block size: `normal` (like the editor) or `small` (about three quarters). Default `normal`. */
   size?: 'normal' | 'small';
+  /** How stacked blocks join, as in the editor. Default `stack`. */
+  joints?: Joints;
 }
 
 function root(level: Level, options: StaticBlocksOptions, ...children: Node[]): HTMLElement {
   injectStyles(document);
   return h(
     'div',
-    { class: `rbk-editor rbk-static${options.size === 'small' ? ' rbk-static-small' : ''}${options.hat === false ? ' rbk-static-nohat' : ''}`, 'data-rbk-theme': options.theme ?? 'auto', 'data-rbk-world': level.world },
+    { class: `rbk-editor rbk-static${options.size === 'small' ? ' rbk-static-small' : ''}${options.hat === false ? ' rbk-static-nohat' : ''}`, 'data-rbk-theme': options.theme ?? 'auto', 'data-rbk-joints': options.joints ?? 'stack', 'data-rbk-world': level.world },
     ...children,
   );
 }

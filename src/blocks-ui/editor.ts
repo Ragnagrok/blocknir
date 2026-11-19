@@ -6,7 +6,7 @@
  * gestures into model calls:
  *
  * - **drag** (mouse, touch, pen) from the palette or the workspace: statements go to the nearest
- *   gap (a line shows where), reporters into a slot that fits (it lights up), hats ("Enseñar…",
+ *   gap (a line shows where), reporters into a slot that fits (it lights up), hats ("Definir para…",
  *   events) anywhere on the workspace; dropping on the palette (the trash) deletes;
  * - **tap**: a palette block goes in at the insertion cursor; a gap moves the cursor; a block opens
  *   a small menu; a slot opens a keypad or a picker; names open a prompt;
@@ -36,7 +36,7 @@ import {
   type Spot,
 } from './model.js';
 import { Renderer } from './render.js';
-import { GROUP_ORDER, isHole, paramSpecOf, Schema, type BlockTemplate, type Group } from './schema.js';
+import { GROUP_ORDER, isHole, KIND_OF, KIND_ORDER, paramSpecOf, Schema, type BlockTemplate, type Group, type Kind } from './schema.js';
 import { injectStyles } from './styles.js';
 import { fmt, mergeText, paramTypeName, type DeepPartial, type UiText } from './text.js';
 
@@ -55,6 +55,10 @@ export interface BlockEditorOptions {
   text?: DeepPartial<UiText>;
   /** `auto` (default) follows the system. */
   theme?: Theme;
+  /** How stacked blocks join (`stack`, the default; `thread`; `link`). */
+  joints?: Joints;
+  /** Show a button in the bar to choose `joints` (it emits `joints`). Default false. */
+  jointsPicker?: boolean;
   /** `auto` (default): narrow (palette on top) when the editor is narrower than `narrowBelow`. */
   layout?: 'auto' | 'wide' | 'narrow';
   /** Width in px under which `auto` layout goes narrow. Default 700. */
@@ -76,7 +80,17 @@ export interface BlockEditorEvents {
   cursor: { spot: Spot };
   /** An edit was refused (over par, a block that does not fit…), with the message shown. */
   refused: { reason: Refusal; message: string };
+  /** The joints were chosen in the bar's picker (save it to use it next time). */
+  joints: { joints: Joints };
 }
+
+/**
+ * How stacked blocks join: `stack`, a compact pile (blocks almost touching, no tabs); `thread`,
+ * blocks apart on a line with a dot each, which shows the order; `link`, blocks apart joined by a
+ * dark connector under each one.
+ */
+export type Joints = 'stack' | 'thread' | 'link';
+export const JOINTS: readonly Joints[] = ['stack', 'thread', 'link'];
 
 type Source = { type: 'template'; tpl: BlockTemplate } | { type: 'stmt'; id: NodeId } | { type: 'expr'; id: NodeId } | { type: 'hat'; id: NodeId };
 
@@ -169,7 +183,7 @@ export class BlockEditor {
   private wsFocusKey: string | null = null;
   private palFocusKey: string | null = null;
   private resize: ResizeObserver | null = null;
-  private listeners: { [K in keyof BlockEditorEvents]: Set<(e: BlockEditorEvents[K]) => void> } = { change: new Set(), cursor: new Set(), refused: new Set() };
+  private listeners: { [K in keyof BlockEditorEvents]: Set<(e: BlockEditorEvents[K]) => void> } = { change: new Set(), cursor: new Set(), refused: new Set(), joints: new Set() };
   private readonly cleanup: Array<() => void> = [];
   private destroyed = false;
 
@@ -190,7 +204,8 @@ export class BlockEditor {
     this.undoBtn = h('button', { class: 'rbk-btn', type: 'button', 'aria-label': `${t.undo} (Ctrl+Z)`, 'data-act': 'undo' }, icon('undo'), h('span', { class: 'rbk-btn-label' }, t.undo));
     this.redoBtn = h('button', { class: 'rbk-btn', type: 'button', 'aria-label': `${t.redo} (Ctrl+Y)`, 'data-act': 'redo' }, icon('redo'), h('span', { class: 'rbk-btn-label' }, t.redo));
     this.statusEl = h('span', { class: 'rbk-bar-title' }, options.title ?? options.level.title ?? t.workspace);
-    const bar = h('div', { class: 'rbk-bar' }, this.statusEl, h('span', { class: 'rbk-count-wrap' }, h('span', { class: 'rbk-sr' }, `${t.blocks}: `), this.countEl), this.undoBtn, this.redoBtn);
+    const jointsBtn = options.jointsPicker ? h('button', { class: 'rbk-btn rbk-joints-btn', type: 'button', 'aria-label': t.jointsMenu, title: t.jointsMenu, 'data-act': 'joints' }, icon('joints')) : null;
+    const bar = h('div', { class: 'rbk-bar' }, this.statusEl, h('span', { class: 'rbk-count-wrap' }, h('span', { class: 'rbk-sr' }, `${t.blocks}: `), this.countEl), this.undoBtn, this.redoBtn, jointsBtn);
 
     this.cats = h('div', { class: 'rbk-cats', role: 'toolbar', 'aria-label': t.palette });
     this.pal = h('div', { class: 'rbk-pal', role: 'listbox', 'aria-label': t.palette, 'aria-orientation': 'vertical' });
@@ -206,7 +221,7 @@ export class BlockEditor {
 
     this.element = h(
       'div',
-      { class: 'rbk-editor', 'data-rbk-theme': options.theme ?? 'auto', 'data-rbk-world': options.level.world },
+      { class: 'rbk-editor', 'data-rbk-theme': options.theme ?? 'auto', 'data-rbk-joints': options.joints ?? 'stack', 'data-rbk-world': options.level.world },
       bar,
       h('div', { class: 'rbk-body' }, this.palette, this.ws),
       this.toastEl,
@@ -289,7 +304,8 @@ export class BlockEditor {
 
   /**
    * Highlights the block that is running (`TraceStep.node`), or none. `stack` (the trace step's
-   * call ids) outlines the calls being executed.
+   * call ids) outlines the calls being executed. A Si or a Repetir hasta que only runs to ask its
+   * question, so the question is what lights up, not the whole block.
    */
   highlight(nodeId: NodeId | null, stack: readonly NodeId[] = []): void {
     this.marks.running = nodeId;
@@ -311,6 +327,26 @@ export class BlockEditor {
 
   setTheme(theme: Theme): void {
     this.element.setAttribute('data-rbk-theme', theme);
+  }
+
+  /** How stacked blocks join. */
+  get joints(): Joints {
+    const j = this.element.getAttribute('data-rbk-joints') as Joints | null;
+    return j && JOINTS.includes(j) ? j : 'stack';
+  }
+
+  setJoints(joints: Joints): void {
+    this.element.setAttribute('data-rbk-joints', joints);
+  }
+
+  /** The bar's picker: choose how blocks join. */
+  private async chooseJoints(): Promise<void> {
+    const cur = this.joints;
+    const r = await this.dialogs.picker({ title: this.text.jointsTitle, options: JOINTS.map((j) => ({ label: this.text.joints[j] ?? j, value: j, pressed: j === cur })) });
+    if (r?.type !== 'value' || r.value === cur) return;
+    const j = r.value as Joints;
+    this.setJoints(j);
+    this.emit('joints', { joints: j });
   }
 
   /** Focuses the workspace at the insertion cursor. */
@@ -445,9 +481,16 @@ export class BlockEditor {
     if (this.schema.variablesAllowed && !groups.has('variables')) groups.set('variables', []);
     const sections: HTMLElement[] = [];
     const chips: HTMLElement[] = [];
+    const chipsOf = new Map<Kind, HTMLElement[]>();
+    const kinds = new Set(GROUP_ORDER.filter((g) => groups.has(g)).map((g) => KIND_OF[g]));
+    let lastKind: Kind | null = null;
     for (const g of GROUP_ORDER) {
       const items = groups.get(g);
       if (!items) continue;
+      const kind = KIND_OF[g];
+      // Each kind (commands, expressions, definitions) starts with its title, when there are several.
+      if (kind !== lastKind && kinds.size > 1) sections.push(h('p', { class: 'rbk-pal-kind', 'aria-hidden': 'true' }, t.kinds[kind] ?? kind));
+      lastKind = kind;
       const hid = `rbk-${this.uid}-h-${g}`;
       const list = h('div', { class: 'rbk-pal-items' });
       for (const x of items) {
@@ -474,10 +517,15 @@ export class BlockEditor {
         list.append(h('button', { class: 'rbk-btn rbk-newvar', type: 'button', 'data-act': 'newVariable', 'data-fk': 't:newvar', tabindex: -1 }, icon('plus', 18), t.newVariable));
       }
       sections.push(h('section', { class: `rbk-pal-sec rbk-g-${g}`, 'data-group': g, role: 'group', 'aria-labelledby': hid }, h('h3', { class: 'rbk-pal-h', id: hid }, t.groups[g]), list));
-      chips.push(h('button', { class: `rbk-cat rbk-g-${g}`, type: 'button', 'data-cat': g }, t.groups[g]));
+      const chip = h('button', { class: `rbk-cat rbk-g-${g}`, type: 'button', 'data-cat': g }, t.groups[g]);
+      chips.push(chip);
+      chipsOf.set(kind, [...(chipsOf.get(kind) ?? []), chip]);
     }
     this.pal.replaceChildren(...sections);
-    this.cats.replaceChildren(...chips);
+    // The chips, by kind: its title, then its groups.
+    this.cats.replaceChildren(
+      ...KIND_ORDER.filter((k) => chipsOf.has(k)).map((k) => h('div', { class: 'rbk-kind', role: 'group', 'aria-label': t.kinds[k] ?? k }, h('span', { class: 'rbk-kind-h', 'aria-hidden': 'true' }, t.kinds[k] ?? k), ...chipsOf.get(k)!)),
+    );
     this.cats.hidden = chips.length < 2;
     this.applyGroupTabs();
   }
@@ -540,7 +588,9 @@ export class BlockEditor {
     for (const id of this.marks.stack) this.nodeEl(id)?.classList.add('rbk-calling');
     let reveal: HTMLElement | null = null;
     if (this.marks.running) {
-      const el = this.nodeEl(this.marks.running);
+      const n = this.model.node(this.marks.running);
+      const asked = n && 'kind' in n ? (n.kind === 'if' ? n.condition : n.kind === 'repeatUntil' ? n.until : null) : null;
+      const el = (asked ? this.nodeEl(asked.id) : null) ?? this.nodeEl(this.marks.running);
       if (el) {
         el.classList.add(el.matches('[data-slot]') ? 'rbk-running-slot' : 'rbk-running');
         reveal = el;
@@ -1023,6 +1073,7 @@ export class BlockEditor {
     if (name === 'undo') this.result(this.model.undo() ? { ok: true } : { ok: false, reason: 'edge' });
     else if (name === 'redo') this.result(this.model.redo() ? { ok: true } : { ok: false, reason: 'edge' });
     else if (name === 'newVariable') void this.newVariable();
+    else if (name === 'joints') void this.chooseJoints();
   }
 
   private showGroup(group: string): void {

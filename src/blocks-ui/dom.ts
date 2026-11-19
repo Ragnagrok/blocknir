@@ -30,6 +30,7 @@ const PATHS: Record<string, string> = {
   flag: 'M6 21V4M6 4h11l-2 4 2 4H6',
   below: 'M12 4v10M7 9l5 5 5-5M5 20h14',
   back: 'M10 6 4 12l6 6M4 12h16',
+  joints: 'M5 4h10v5H5zM5 9.5h14v5H5zM5 15h8v5H5z',
 };
 
 /** An inline SVG icon (decorative: hidden from screen readers). */

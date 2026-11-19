@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **blocks-ui**: three ways for stacked blocks to join (`Joints`): `stack` (the default), a compact
+  pile with no tabs; `thread`, blocks apart on a line with a dot each, which shows the order;
+  `link`, blocks apart joined by a dark connector. `BlockEditorOptions.joints`,
+  `editor.joints`/`setJoints()`, `StaticBlocksOptions.joints`, and `jointsPicker: true` adds a
+  button to the bar to choose (event `joints`; texts `jointsMenu`, `jointsTitle`, `joints`).
+  Each one keeps a single spacing: above, between and below the blocks inside a C as between
+  blocks.
+- **blocks-ui**: while a Si or a Repetir hasta que asks its question, the question lights up, not
+  the whole block (a question's slot glows around its shape).
+
 ## 0.3.7
 
 Back to the blocks of 0.3.4.

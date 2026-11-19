@@ -29,7 +29,7 @@ const lamps: GridLevel = {
     choices: { directions: ['N', 'E', 'S', 'W'] },
     par: 8,
   },
-  labels: { blocks: { procedure: 'Enseñar a Tito: {name}', call: 'Tito sabe: {name}' } },
+  labels: { blocks: { procedure: 'Definir para Tito: {name}', call: 'Tito sabe: {name}' } },
 };
 
 const main = { kind: 'main' } as const;
@@ -71,7 +71,7 @@ describe('schema: palette templates and new blocks', () => {
     const { schema, model, stmt: make, make: reporter } = setup();
     const ts = schema.templates(model.program, { variables: [] });
     expect(new Set(ts.map((t) => t.group))).toEqual(new Set(['actions', 'sensors', 'control', 'values', 'procedures']));
-    expect(ts.find((t) => t.key === 'procedure')).toMatchObject({ shape: 'hat', creates: 'procedure', label: 'Enseñar a Tito: {name}' });
+    expect(ts.find((t) => t.key === 'procedure')).toMatchObject({ shape: 'hat', creates: 'procedure', label: 'Definir para Tito: {name}' });
     const move = make('command:move');
     expect(move).toMatchObject({ kind: 'command', command: 'move', args: [{ kind: 'direction', value: 'N' }] });
     const rep = make('control:repeat');

@@ -28,7 +28,7 @@ export const REQUIREMENT_LABELS: LabelOverrides = {
   goals: {
     'requires.min': 'Hay que usar el bloque "{block}" (al menos {min} veces).',
     'requires.max': 'El bloque "{block}" se puede usar hasta {max} veces, y está {count} veces.',
-    'requires.procedure': 'Falta un bloque enseñado con {params} huecos, usado con {distinct} valores distintos.',
+    'requires.procedure': 'Falta un comando definido con {params} huecos, usado con {distinct} valores distintos.',
   },
 };
 

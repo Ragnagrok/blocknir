@@ -15,7 +15,7 @@ describe('label templates', () => {
       { type: 'text', text: 'en' },
       { type: 'slot', index: 0 },
     ]);
-    expect(parseTemplate('Enseñar a Tito: {name}')).toEqual([{ type: 'text', text: 'Enseñar a Tito:' }, { type: 'field', field: 'name' }]);
+    expect(parseTemplate('Definir para Tito: {name}')).toEqual([{ type: 'text', text: 'Definir para Tito:' }, { type: 'field', field: 'name' }]);
     // Unknown placeholders stay as text.
     expect(parseTemplate('{x} y {1}')).toEqual([{ type: 'text', text: '{x} y' }, { type: 'slot', index: 1 }]);
     expect(templateSlots(parseTemplate('{0} + {1}'))).toEqual([0, 1]);
@@ -31,7 +31,7 @@ describe('label templates', () => {
   it('fills templates as plain text for aria labels', () => {
     expect(fillTemplate('Repetir {0} veces', ['3'])).toBe('Repetir 3 veces');
     expect(fillTemplate('Fijar {var} en {0}', [], { var: 'pasos' })).toBe('Fijar pasos en …');
-    expect(fillTemplate('Enseñar a Tito: {name}', [], { name: 'fila' })).toBe('Enseñar a Tito: fila');
+    expect(fillTemplate('Definir para Tito: {name}', [], { name: 'fila' })).toBe('Definir para Tito: fila');
   });
 
   it('merges UI text and formats it', () => {

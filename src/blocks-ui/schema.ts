@@ -44,6 +44,23 @@ export type Group = 'actions' | 'control' | 'sensors' | 'values' | 'variables' |
 
 export const GROUP_ORDER: readonly Group[] = ['actions', 'control', 'sensors', 'values', 'variables', 'procedures', 'events'];
 
+/**
+ * The palette's three kinds of block, each with its groups: commands (what runs: actions and
+ * control), expressions (what gives a value: sensors and operations) and definitions (what names
+ * something: variables, procedures, events).
+ */
+export type Kind = 'commands' | 'expressions' | 'definitions';
+export const KIND_ORDER: readonly Kind[] = ['commands', 'expressions', 'definitions'];
+export const KIND_OF: Readonly<Record<Group, Kind>> = {
+  actions: 'commands',
+  control: 'commands',
+  sensors: 'expressions',
+  values: 'expressions',
+  variables: 'definitions',
+  procedures: 'definitions',
+  events: 'definitions',
+};
+
 /** How a block looks. `c` has one mouth (repeat, if), `cc` two (if / else), `hat` starts a script. */
 export type Shape = 'stack' | 'c' | 'cc' | 'reporter' | 'boolean' | 'hat';
 

@@ -32,6 +32,13 @@ export interface UiText {
    * picker shows these; the chip shows them without the article (`número`).
    */
   paramTypes: Record<string, string>;
+  /** The bar's button that chooses how blocks join, and its picker's title. */
+  jointsMenu: string;
+  jointsTitle: string;
+  /** The palette's kinds of block, over the groups: `commands`, `expressions`, `definitions`. */
+  kinds: Record<string, string>;
+  /** The names of the joints: `stack`, `thread`, `link`. */
+  joints: Record<string, string>;
   /** Asks what a new variable holds (`{name}`). */
   variableTypeTitle: string;
   /** The variable picker's entry that changes what a variable holds (`{name}`). */
@@ -83,9 +90,9 @@ export const DEFAULT_TEXT: UiText = {
     actions: 'Acciones',
     control: 'Control',
     sensors: 'Sensores',
-    values: 'Valores',
+    values: 'Operaciones',
     variables: 'Variables',
-    procedures: 'Enseñar…',
+    procedures: 'Procedimientos',
     events: 'Eventos',
   },
   palette: 'Bloques para usar',
@@ -122,6 +129,10 @@ export const DEFAULT_TEXT: UiText = {
     'name:sound': 'Un sonido',
     'name:look': 'Un aspecto',
   },
+  kinds: { commands: 'Comandos', expressions: 'Expresiones', definitions: 'Definiciones' },
+  jointsMenu: 'Forma de los bloques',
+  jointsTitle: '¿Cómo se unen los bloques?',
+  joints: { stack: 'Pila', thread: 'Hilo', link: 'Unidos' },
   variableTypeTitle: '¿Qué guarda “{name}”?',
   variableTypeMenu: 'Qué guarda “{name}”',
   variableTypes: {
@@ -130,7 +141,7 @@ export const DEFAULT_TEXT: UiText = {
     boolean: 'Verdadero o falso',
     any: 'Cualquier cosa',
   },
-  deleteProcedure: 'Borrar enseñanza',
+  deleteProcedure: 'Borrar definición',
   deleteHandler: 'Borrar evento',
   newVariable: 'Nueva variable…',
   createVariable: 'Crear una variable',
@@ -143,8 +154,8 @@ export const DEFAULT_TEXT: UiText = {
   ok: 'Listo',
   cancel: 'Cancelar',
   confirmDelete: 'Borrar',
-  confirmDeleteProcedure: 'Hay {count} bloques que usan “{name}”. Si borrás la enseñanza, se borran también. ¿Borrar igual?',
-  nameProcedure: '¿Cómo se llama lo que le enseñás?',
+  confirmDeleteProcedure: 'Hay {count} bloques que usan “{name}”. Si borrás la definición, se borran también. ¿Borrar igual?',
+  nameProcedure: '¿Cómo se llama el comando nuevo?',
   nameParam: '¿Cómo se llama el hueco?',
   nameVariable: '¿Cómo se llama la variable?',
   defaultProcedure: 'mi bloque',
@@ -161,7 +172,7 @@ export const DEFAULT_TEXT: UiText = {
   refused: {
     par: 'Ya usaste los {par} bloques de este desafío.',
     type: 'Ese bloque no entra en este hueco.',
-    scope: 'Ese hueco sólo se puede usar adentro de su enseñanza.',
+    scope: 'Ese hueco sólo se puede usar adentro de su definición.',
     cycle: 'Un bloque no puede ir adentro de sí mismo.',
     duplicateName: 'Ya hay uno con ese nombre.',
     name: 'Falta el nombre.',
@@ -190,6 +201,8 @@ export function mergeText(over: DeepPartial<UiText> | undefined): UiText {
     refused: { ...DEFAULT_TEXT.refused, ...over.refused },
     paramTypes: { ...DEFAULT_TEXT.paramTypes, ...over.paramTypes },
     variableTypes: { ...DEFAULT_TEXT.variableTypes, ...over.variableTypes },
+    joints: { ...DEFAULT_TEXT.joints, ...over.joints },
+    kinds: { ...DEFAULT_TEXT.kinds, ...over.kinds },
   } as UiText;
 }
 

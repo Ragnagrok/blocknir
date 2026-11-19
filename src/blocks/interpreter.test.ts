@@ -113,8 +113,8 @@ describe('errors children can understand', () => {
     ['infinite loop', b.program([b.until(b.bool(false))]), 'stepLimit', 'El programa hizo más de 50 pasos sin terminar. ¿Habrá una repetición que no termina nunca?'],
     ['recursion', b.program([b.call('again')], [b.proc('again', [], b.call('again'))]), 'recursionDepth', 'Hay procedimientos que se llaman entre sí demasiadas veces (más de 10).'],
     ['param count', b.program([b.call('p', 1, 2)], [b.proc('p', ['a'])]), 'paramCount', '"p" necesita 1 datos y recibió 2.'],
-    ['unknown procedure', b.program([b.call('nope')]), 'unknownProcedure', 'No existe un bloque enseñado que se llame "nope".'],
-    ['unknown param', b.program([b.cmd('emit', b.param('q'))]), 'unknownParam', '"q" no es un hueco de este bloque enseñado.'],
+    ['unknown procedure', b.program([b.call('nope')]), 'unknownProcedure', 'No existe un comando definido que se llame "nope".'],
+    ['unknown param', b.program([b.cmd('emit', b.param('q'))]), 'unknownParam', '"q" no es un hueco de este comando definido.'],
     ['unset variable', b.program([b.cmd('emit', b.v('score'))]), 'unknownVariable', '"score" todavía no tiene ningún valor.'],
     ['not a condition', b.program([b.if(b.num(3), b.cmd('emit', 1))]), 'notBoolean', 'Acá va una pregunta que se conteste con sí o no.'],
     ['bad repeat', b.program([b.repeat(-2, b.cmd('emit', 1))]), 'badCount', 'No se puede repetir -2 veces: tiene que ser un número entero, 0 o más.'],
@@ -122,7 +122,7 @@ describe('errors children can understand', () => {
     ['slot type', b.program([b.cmd('emit', 'N')]), 'argType', '"emit" esperaba un número en el hueco 1.'],
     ['unknown command', b.program([b.cmd('fly')]), 'unknownCommand', 'No conozco el bloque "fly".'],
     ['world failure', b.program([b.cmd('boom')]), 'actionFailed', 'No puedo boom acá: falta x.'],
-    ['duplicate procedure', b.program([], [b.proc('p', []), b.proc('p', [])]), 'duplicateProcedure', 'Hay dos bloques enseñados que se llaman "p".'],
+    ['duplicate procedure', b.program([], [b.proc('p', []), b.proc('p', [])]), 'duplicateProcedure', 'Hay dos comandos definidos que se llaman "p".'],
   ];
   for (const [name, program, code, message] of cases) {
     it(name, () => {

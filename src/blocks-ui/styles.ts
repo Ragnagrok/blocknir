@@ -122,7 +122,13 @@ export const CSS = `
 .rbk-narrow .rbk-ws-content { padding: 10px 10px 120px; }
 
 /* ---------- palette ---------- */
-.rbk-cats { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border-bottom: 1px solid var(--rbk-border); flex: none; }
+.rbk-cats { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-bottom: 1px solid var(--rbk-border); flex: none; }
+/* A kind (Comandos, Expresiones, Definiciones): its title, then its groups' chips. */
+.rbk-kind { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rbk-kind-h { flex: 0 0 100%; margin: 2px 2px 0; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--rbk-muted); }
+.rbk-pal-kind { margin: 18px 2px 0; padding-bottom: 4px; border-bottom: 2px solid var(--rbk-border); font-size: 13px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--rbk-muted); }
+.rbk-pal-kind:first-child { margin-top: 4px; }
+.rbk-narrow .rbk-cats:not([hidden]) + .rbk-pal .rbk-pal-kind { display: none; }
 .rbk-cats[hidden] { display: none; }
 .rbk-narrow .rbk-cats { gap: 6px; padding: 6px 8px; }
 .rbk-narrow .rbk-cat { min-height: 36px; padding: 0 10px; font-size: 14px; }
@@ -219,6 +225,8 @@ export const CSS = `
 .rbk-active-slot { outline: 3px dashed var(--rbk-focus); outline-offset: 2px; }
 .rbk-running > .rbk-row, .rbk-running > .rbk-foot, .rbk-rep.rbk-running, .rbk-hat.rbk-running > .rbk-row { outline: 4px solid var(--rbk-running); outline-offset: 2px; box-shadow: 0 0 18px 6px var(--rbk-running-glow), inset 0 -3px 0 rgba(0, 0, 0, 0.2); }
 .rbk-slot.rbk-running-slot { outline: 4px solid var(--rbk-running); outline-offset: 2px; box-shadow: 0 0 14px 4px var(--rbk-running-glow); }
+/* A question (hexagon, clipped) cannot show an outline: its slot glows around its shape instead. */
+.rbk-slot:has(> .rbk-bool.rbk-running) { filter: drop-shadow(0 2.5px 0 var(--rbk-running)) drop-shadow(0 -2.5px 0 var(--rbk-running)) drop-shadow(2.5px 0 0 var(--rbk-running)) drop-shadow(-2.5px 0 0 var(--rbk-running)) drop-shadow(0 0 10px var(--rbk-running-glow)); }
 .rbk-calling > .rbk-row { outline: 3px dashed var(--rbk-running); outline-offset: 2px; }
 .rbk-error-mark > .rbk-row:first-child, .rbk-rep.rbk-error-mark, .rbk-slot.rbk-error-slot { outline: 4px solid var(--rbk-error); outline-offset: 2px; }
 .rbk-issue > .rbk-row:first-child, .rbk-rep.rbk-issue { outline: 3px dashed var(--rbk-error); outline-offset: 2px; }
@@ -276,6 +284,45 @@ export const CSS = `
 .rbk-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .rbk-key { min-height: 56px; border: 0; border-radius: 14px; background: var(--rbk-btn-bg); color: var(--rbk-btn-text); font: inherit; font-size: 26px; font-weight: 800; cursor: pointer; }
 .rbk-key:active, .rbk-choice-btn:active, .rbk-dlg-btn:active, .rbk-mbtn:active { transform: translateY(1px); }
+
+/* ---------- how stacked blocks join (data-rbk-joints on the editor or the static picture) ---------- */
+.rbk-editor { --rbk-thread: color-mix(in srgb, var(--rbk-muted) 45%, transparent); }
+/* stack: a compact pile. Blocks almost touch, no tabs, smaller corners; a C hugs what it holds. */
+[data-rbk-joints="stack"] .rbk-gap:not(.rbk-end):not(.rbk-empty):not(.rbk-cursor) { height: 3px; }
+[data-rbk-joints="stack"] .rbk-mouth .rbk-gap.rbk-end:not(.rbk-cursor):not(.rbk-empty) { height: 3px; }
+[data-rbk-joints="stack"] .rbk-stmt::after, [data-rbk-joints="stack"] .rbk-hat::after { display: none; }
+[data-rbk-joints="stack"] .rbk-row { border-radius: 7px; }
+[data-rbk-joints="stack"] .rbk-hat > .rbk-row { border-radius: 18px 18px 7px 7px; }
+[data-rbk-joints="stack"] .rbk-c > .rbk-row:first-child { border-radius: 7px 7px 7px 0; }
+[data-rbk-joints="stack"] .rbk-mid { border-radius: 0 7px 7px 0; }
+[data-rbk-joints="stack"] .rbk-foot { height: 14px; border-radius: 0 7px 7px 7px; }
+[data-rbk-joints="stack"] .rbk-arm { width: 14px; }
+[data-rbk-joints="stack"] .rbk-mouth { min-height: 36px; }
+/* One spacing everywhere: the list's own gaps (3px) above, between and below the blocks inside. */
+[data-rbk-joints="stack"] .rbk-mouth > .rbk-list { padding: 0 0 0 3px; }
+/* thread: blocks apart on a line, a dot on each; the order reads down the line. */
+[data-rbk-joints="thread"] .rbk-gap:not(.rbk-end):not(.rbk-empty):not(.rbk-cursor) { height: 10px; }
+[data-rbk-joints="thread"] .rbk-mouth .rbk-gap.rbk-end:not(.rbk-cursor):not(.rbk-empty) { height: 0; }
+[data-rbk-joints="thread"] .rbk-stmt::after, [data-rbk-joints="thread"] .rbk-hat::after { display: none; }
+[data-rbk-joints="thread"] .rbk-script { position: relative; padding-left: 34px; }
+[data-rbk-joints="thread"] .rbk-script::before { content: ""; position: absolute; left: 19px; top: 37px; bottom: 58px; width: 4px; border-radius: 2px; background: var(--rbk-thread); }
+[data-rbk-joints="thread"].rbk-static .rbk-script { padding-left: 24px; }
+[data-rbk-joints="thread"].rbk-static .rbk-script::before { left: 9px; top: 27px; bottom: 24px; }
+[data-rbk-joints="thread"] .rbk-script > .rbk-hat::before, [data-rbk-joints="thread"] .rbk-list:not(.rbk-preview-list) > .rbk-stmt::before { content: ""; position: absolute; z-index: 4; left: -20px; top: calc(var(--rbk-hit) / 2 - 7px); width: 14px; height: 14px; border-radius: 50%; background: var(--rbk-ws-bg); border: 3px solid var(--rbk-cat); }
+[data-rbk-joints="thread"] .rbk-script > .rbk-hat::before { top: 20px; background: var(--rbk-cat); }
+[data-rbk-joints="thread"] .rbk-mouth > .rbk-list:not(.rbk-preview-list) { position: relative; padding: 0 6px 10px 26px; }
+[data-rbk-joints="thread"] .rbk-mouth > .rbk-list:not(.rbk-preview-list)::before { content: ""; position: absolute; left: 11px; top: calc(10px + var(--rbk-hit) / 2); bottom: calc(10px + var(--rbk-hit) / 2); width: 4px; border-radius: 2px; background: var(--rbk-thread); }
+/* link: blocks apart, a dark connector from each one to the next (and from a C's top to what it holds). */
+[data-rbk-joints="link"] .rbk-gap:not(.rbk-end):not(.rbk-empty):not(.rbk-cursor) { height: 10px; }
+[data-rbk-joints="link"] .rbk-mouth .rbk-gap.rbk-end:not(.rbk-cursor):not(.rbk-empty) { height: 0; }
+[data-rbk-joints="link"] .rbk-stmt::after, [data-rbk-joints="link"] .rbk-hat::after { left: 20px; bottom: -10px; width: 24px; height: 10px; border-radius: 0; background: color-mix(in srgb, var(--rbk-cat) 68%, #000); box-shadow: none; }
+[data-rbk-joints="link"] .rbk-mouth { position: relative; }
+[data-rbk-joints="link"] .rbk-mouth::before { content: ""; position: absolute; z-index: 1; top: 0; left: 38px; width: 24px; height: 10px; background: color-mix(in srgb, var(--rbk-cat) 68%, #000); }
+/* The list's first gap is the 10px under the C's top: no padding on top, or the connector falls short. */
+[data-rbk-joints="link"] .rbk-mouth > .rbk-list { padding: 0 6px 10px 0; }
+/* Nothing to join after the last block of a script, nor in the palette. */
+[data-rbk-joints="link"] .rbk-script > .rbk-list > .rbk-stmt:has(+ .rbk-gap.rbk-end)::after { display: none; }
+[data-rbk-joints="link"] .rbk-pitem .rbk-mouth::before { display: none; }
 
 /* ---------- toast and screen reader text ---------- */
 .rbk-toast { position: absolute; z-index: 40; left: 50%; bottom: 18px; transform: translate(-50%, 12px); max-width: calc(100% - 32px); padding: 12px 18px; border-radius: 14px; background: var(--rbk-toast-bg); color: var(--rbk-toast-text); font-weight: 800; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; }

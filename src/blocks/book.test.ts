@@ -21,7 +21,7 @@ describe('preset blocks', () => {
       control: ['if'],
       procedures: true,
     },
-    labels: { blocks: { procedure: 'Enseñar a Monita: {name}' } },
+    labels: { blocks: { procedure: 'Definir para Monita: {name}' } },
   };
 
   it('the palette lists them with their labels and fixed arguments', () => {
@@ -32,7 +32,7 @@ describe('preset blocks', () => {
       { key: 'paint', category: 'command', label: 'Pintar', params: [{ type: 'name', name: 'color' }], args: ['red'] },
       { key: 'itemHere', category: 'sensor', label: '¿Hay manzana?', params: [{ type: 'name', name: 'item' }], returns: 'boolean', args: ['apple'] },
     ]);
-    expect(p.find((e) => e.key === 'procedure')!.label).toBe('Enseñar a Monita: {name}');
+    expect(p.find((e) => e.key === 'procedure')!.label).toBe('Definir para Monita: {name}');
   });
 
   it('a program must use them as given', () => {
@@ -73,7 +73,7 @@ describe('program requirements', () => {
     const r = check(level, b.program([b.call('row4'), b.cmd('backToEdge'), b.cmd('move', 'S'), b.call('row2')], [row4, row2]));
     expect(r.cases[0]!.passed).toBe(true);
     expect(r.passed).toBe(false);
-    expect(r.message).toBe('Funciona, pero falta algo: Falta un bloque enseñado con 1 huecos, usado con 2 valores distintos.');
+    expect(r.message).toBe('Funciona, pero falta algo: Falta un comando definido con 1 huecos, usado con 2 valores distintos.');
   });
 
   it('the main stack only calls procedures, with a custom message', () => {
@@ -83,13 +83,13 @@ describe('program requirements', () => {
       board: { width: 1, height: 1, robot: { x: 0, y: 0 } },
       actions: [{ name: 'lieDown' }, { name: 'closeEyes' }],
       goal: { type: 'sequence', commands: ['lieDown', 'closeEyes'] },
-      requires: [{ type: 'uses', block: 'lieDown', in: 'main', max: 0, message: 'Usá el bloque enseñado "dormirse".' }],
+      requires: [{ type: 'uses', block: 'lieDown', in: 'main', max: 0, message: 'Usá el comando definido "dormirse".' }],
       toolbox: { commands: ['lieDown', 'closeEyes'], procedures: true },
     };
     const sleep = b.proc('fallAsleep', [], b.cmd('lieDown'), b.cmd('closeEyes'));
     expect(check(scene, b.program([b.call('fallAsleep')], [sleep])).passed).toBe(true);
     const loose = check(scene, b.program([b.cmd('lieDown'), b.cmd('closeEyes')]));
-    expect(loose.message).toBe('Funciona, pero falta algo: Usá el bloque enseñado "dormirse".');
+    expect(loose.message).toBe('Funciona, pero falta algo: Usá el comando definido "dormirse".');
   });
 });
 
@@ -166,7 +166,7 @@ describe('the README example level', () => {
         "commands": [{ "name": "move", "args": ["E"], "label": "Mover →" }, "lightLamp"],
         "sensors": [{ "name": "itemHere", "args": ["flag"], "label": "¿Llegué al final?" }],
         "control": ["repeat", "repeatUntil"] },
-      "labels": { "blocks": { "procedure": "Enseñar a Tito: {name}" } }
+      "labels": { "blocks": { "procedure": "Definir para Tito: {name}" } }
     }`) as Level;
     const program = b.program([b.until(b.sensor('itemHere', 'flag'), b.cmd('lightLamp'), b.cmd('move', 'E'))]);
     const r = check(level, program);
