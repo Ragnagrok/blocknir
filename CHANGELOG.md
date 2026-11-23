@@ -1,7 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.3.8
 
+Variable monitors, three ways to join blocks, and a palette in three kinds.
+
+- **blocks-ui**: `editor.variables`, the variables the program can use (for variable monitors).
 - **blocks-ui**: three ways for stacked blocks to join (`Joints`): `stack` (the default), a compact
   pile with no tabs; `thread`, blocks apart on a line with a dot each, which shows the order;
   `link`, blocks apart joined by a dark connector. `BlockEditorOptions.joints`,
@@ -11,6 +14,11 @@
   blocks.
 - **blocks-ui**: while a Si or a Repetir hasta que asks its question, the question lights up, not
   the whole block (a question's slot glows around its shape).
+- **blocks-ui**: the palette groups its categories in three kinds (`Kind`, `KIND_OF`, `KIND_ORDER`):
+  Comandos (Acciones, Control), Expresiones (Sensores, Operaciones) and Definiciones (Variables,
+  Procedimientos, Eventos), each with a title (text `kinds`).
+- **blocks**: a procedure's definition reads «Definir: {name}», and the messages say «comando
+  definido».
 
 ## 0.3.7
 

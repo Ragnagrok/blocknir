@@ -288,6 +288,11 @@ export class BlockEditor {
     return this.model.blockCount;
   }
 
+  /** The variables the program can use: the level's shared ones, the ones in use and the ones created. */
+  get variables(): string[] {
+    return this.model.variables;
+  }
+
   get readOnly(): boolean {
     return this.model.readOnly;
   }
