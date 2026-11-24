@@ -62,7 +62,7 @@ PROJECT=path/to/project.json npm run dev
 The engine is not on npm yet. Install it from GitHub; `three` is a peer dependency:
 
 ```sh
-npm install three github:Ragnagrok/blocknir
+npm install three blocknir
 ```
 
 ```ts

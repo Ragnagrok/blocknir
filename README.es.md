@@ -67,7 +67,7 @@ PROJECT=ruta/al/proyecto.json npm run dev
 Todavía no está en npm. Se instala desde GitHub; `three` es una dependencia par:
 
 ```sh
-npm install three github:Ragnagrok/blocknir
+npm install three blocknir
 ```
 
 ```ts
