@@ -1,6 +1,8 @@
-# Ragnagrok Engine
+# Blocknir
 
 *[Read in English](README.md)*
+
+*Blocknir: el martillo con el que se forjan mundos de bloques.*
 
 Un engine de voxels chico para la web, escrito en TypeScript sobre [three.js](https://threejs.org).
 Trae un editor en el navegador y un motor de sonido sintetizado: un juego se puede hacer con
@@ -9,6 +11,10 @@ modelos, escenas y sonido, sin archivos de imagen ni de audio.
 Salió de dos juegos de [Ragnagrok](https://github.com/Ragnagrok): **Nullgard**, una aventura vista
 desde arriba sobre aprender a programar, y un prototipo de survival horror en voxels con cámaras
 fijas.
+
+El nombre sigue a los objetos legendarios de la mitología nórdica, que terminan en *-nir* y dicen lo
+que hacen: Mjölnir, el martillo de Thor; Gungnir, la lanza de Odín; Draupnir, su anillo. Blocknir es
+el que forja bloques.
 
 - **Modelos de voxels** con un formato comprimido, mallado por trozos con oclusión ambiental por
   vértice, colores que emiten luz y copias baratas de los objetos que se repiten.
@@ -34,8 +40,8 @@ Online, sin instalar nada: **<https://engine.ragnagrok.com>** (el editor y los e
 O en tu máquina:
 
 ```sh
-git clone https://github.com/Ragnagrok/ragnagrok-engine.git
-cd ragnagrok-engine
+git clone https://github.com/Ragnagrok/blocknir.git
+cd blocknir
 npm install
 npm run dev
 ```
@@ -61,12 +67,12 @@ PROJECT=ruta/al/proyecto.json npm run dev
 Todavía no está en npm. Se instala desde GitHub; `three` es una dependencia par:
 
 ```sh
-npm install three github:Ragnagrok/ragnagrok-engine
+npm install three github:Ragnagrok/blocknir
 ```
 
 ```ts
-import { createGrid, newModel, setCell, setGrid } from 'ragnagrok-engine/core';
-import { placeModel, View } from 'ragnagrok-engine/render';
+import { createGrid, newModel, setCell, setGrid } from 'blocknir/core';
+import { placeModel, View } from 'blocknir/render';
 
 const caja = newModel('caja', 'Caja', [8, 8, 8], 0.125, false, [0x8a5a34, 0x5a3a20]);
 const grilla = createGrid(8, 8, 8);
@@ -86,7 +92,7 @@ vista.renderer.setAnimationLoop((ms) => vista.render(ms / 1000));
 El sonido tampoco necesita archivos:
 
 ```ts
-import { DEMO_TRACK, GameAudio } from 'ragnagrok-engine/audio';
+import { DEMO_TRACK, GameAudio } from 'blocknir/audio';
 
 const audio = new GameAudio({ storageKey: 'mi-juego.audio' });
 audio.start(); // empieza a sonar después del primer toque o tecla
@@ -98,14 +104,14 @@ audio.play((sfx) => sfx.step('stone'));
 
 | Import | Qué tiene |
 |---|---|
-| `ragnagrok-engine/core` | El formato del proyecto (`Project`, `Model`, `Scene`, `Figure`…), grillas de voxels y rayos, poses por claves, el mapa de alturas y la búsqueda de caminos, la validación, y `migrateLegacyProject` para proyectos guardados por el editor original en español. Sin DOM ni three.js. |
-| `ragnagrok-engine/render` | El mallado (`meshVoxels`, `VoxelMesh`), `buildScene`, `Figure3D` y `View`: renderer, sombras, bloom y un acabado de película suave. |
-| `ragnagrok-engine/audio` | `AudioEngine`, `INSTRUMENTS`, el secuenciador `Playback` y la teoría musical, `Sfx`, `Ambience` y la fachada `GameAudio`. |
-| `ragnagrok-engine/kit` | `Joystick`, `Dialogue`, `Director`, `Actor`, `SaveSlot`. |
-| `ragnagrok-engine/paint` | `VoxelCanvas` y funciones de ruido para modelos procedurales, y `createHumanoid`, un personaje de voxels paramétrico (piel, pelo, ropa, anteojos, barba, silueta) ya articulado con clips de reposo, caminar, consultar y hablar. |
-| `ragnagrok-engine/blocks` | Un lenguaje de programación con bloques para chicos y su intérprete, con los mundos donde corren los programas: una grilla con un robot (objetos, faroles, flechas, paredes, acciones definidas por cada nivel), una tortuga que dibuja y una arena en tiempo real por tics con actores que tienen sus propios guiones. Los niveles, los objetivos y las trazas de ejecución son JSON; `check(nivel, programa)` prueba un programa en todos los tableros y explica por qué falla, en español por defecto. Sin DOM ni three.js. Ver [`src/blocks/README.md`](src/blocks/README.md). |
-| `ragnagrok-engine/blocks-ui` | `BlockEditor`: un editor de bloques pensado para el dedo (arrastrar, tocar o teclado), que cuenta los bloques contra el límite del nivel, marca el bloque que se ejecuta, muestra los errores en un globito, tiene deshacer y tema claro u oscuro. DOM puro, sin framework. |
-| `ragnagrok-engine/blocks-3d` | `BoardView`: dibuja y anima en voxels los mundos de grilla, tortuga y tiempo real a partir de una traza, con skins para que cada juego tenga sus personajes, objetos y pisos. Trae una skin por defecto. |
+| `blocknir/core` | El formato del proyecto (`Project`, `Model`, `Scene`, `Figure`…), grillas de voxels y rayos, poses por claves, el mapa de alturas y la búsqueda de caminos, la validación, y `migrateLegacyProject` para proyectos guardados por el editor original en español. Sin DOM ni three.js. |
+| `blocknir/render` | El mallado (`meshVoxels`, `VoxelMesh`), `buildScene`, `Figure3D` y `View`: renderer, sombras, bloom y un acabado de película suave. |
+| `blocknir/audio` | `AudioEngine`, `INSTRUMENTS`, el secuenciador `Playback` y la teoría musical, `Sfx`, `Ambience` y la fachada `GameAudio`. |
+| `blocknir/kit` | `Joystick`, `Dialogue`, `Director`, `Actor`, `SaveSlot`. |
+| `blocknir/paint` | `VoxelCanvas` y funciones de ruido para modelos procedurales, y `createHumanoid`, un personaje de voxels paramétrico (piel, pelo, ropa, anteojos, barba, silueta) ya articulado con clips de reposo, caminar, consultar y hablar. |
+| `blocknir/blocks` | Un lenguaje de programación con bloques para chicos y su intérprete, con los mundos donde corren los programas: una grilla con un robot (objetos, faroles, flechas, paredes, acciones definidas por cada nivel), una tortuga que dibuja y una arena en tiempo real por tics con actores que tienen sus propios guiones. Los niveles, los objetivos y las trazas de ejecución son JSON; `check(nivel, programa)` prueba un programa en todos los tableros y explica por qué falla, en español por defecto. Sin DOM ni three.js. Ver [`src/blocks/README.md`](src/blocks/README.md). |
+| `blocknir/blocks-ui` | `BlockEditor`: un editor de bloques pensado para el dedo (arrastrar, tocar o teclado), que cuenta los bloques contra el límite del nivel, marca el bloque que se ejecuta, muestra los errores en un globito, tiene deshacer y tema claro u oscuro. DOM puro, sin framework. |
+| `blocknir/blocks-3d` | `BoardView`: dibuja y anima en voxels los mundos de grilla, tortuga y tiempo real a partir de una traza, con skins para que cada juego tenga sus personajes, objetos y pisos. Trae una skin por defecto. |
 
 Las posiciones van en metros, el tamaño de los modelos en voxels y los ángulos en radianes. Un rumbo
 0 mira hacia +z. El código está en inglés; [`GLOSSARY.md`](GLOSSARY.md) traduce cada nombre al que

@@ -4,7 +4,7 @@
  * into place, hints and printouts.
  *
  * ```ts
- * import { renderProgram, renderStatement } from 'ragnagrok-engine/blocks-ui';
+ * import { renderProgram, renderStatement } from 'blocknir/blocks-ui';
  * el.append(renderProgram(level, program));
  * bank.append(renderStatement(level, blocks.cmd('move', 'E')));
  * ```

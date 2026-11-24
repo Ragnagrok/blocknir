@@ -1,4 +1,4 @@
-# Ragnagrok Engine
+# Blocknir
 
 Public, MIT-licensed voxel engine for the web, extracted from two games of the user (casa-voxel and
 Nullgard). Code, comments and identifiers in English; README in English and Spanish (`README.md`,

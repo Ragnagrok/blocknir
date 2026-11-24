@@ -13,6 +13,7 @@ import { flushGrids, migrateLegacyProject, type Project } from '../src/core/inde
 export type Store = 'disk' | 'browser';
 
 const API = '/api/project';
+// Storage names from before the rename to Blocknir; kept so projects already saved in browsers still load.
 const DB_NAME = 'ragnagrok-engine';
 const DB_STORE = 'projects';
 const DB_KEY = 'current';
@@ -178,7 +179,7 @@ export async function saveProjectFile(p: Project): Promise<'saved' | 'downloaded
     try {
       const handle = await picker.call(window, {
         suggestedName: name,
-        types: [{ description: 'Ragnagrok Engine project', accept: { 'application/json': ['.json'] } }],
+        types: [{ description: 'Blocknir project', accept: { 'application/json': ['.json'] } }],
       });
       const out = await handle.createWritable();
       await out.write(blob);

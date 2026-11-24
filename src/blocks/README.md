@@ -1,11 +1,11 @@
-# ragnagrok-engine/blocks
+# blocknir/blocks
 
 A block-based programming language for kids, its interpreter, and the worlds programs run in.
 Pure TypeScript: no DOM, no three.js, no clocks, no `Math.random()` (randomness comes from seeds).
 Programs, levels, traces and states are plain JSON.
 
 ```ts
-import { blocks, check, runCase, palette, type GridLevel } from 'ragnagrok-engine/blocks';
+import { blocks, check, runCase, palette, type GridLevel } from 'blocknir/blocks';
 ```
 
 Three kinds of code use this module:

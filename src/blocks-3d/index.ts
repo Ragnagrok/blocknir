@@ -1,5 +1,5 @@
 /**
- * A three.js renderer for the block-language worlds of `ragnagrok-engine/blocks`: grid boards,
+ * A three.js renderer for the block-language worlds of `blocknir/blocks`: grid boards,
  * the drawing turtle and realtime arenas, from a fixed three-quarter camera that frames the whole
  * board (or follows the character on long boards). Runs animate from their traces; realtime games
  * from their ticks. Names (items, terrain, actors) become visuals through a `Skin`; the default

@@ -1,11 +1,11 @@
 /**
- * A touch-friendly DOM block editor for `ragnagrok-engine/blocks`: a palette from
+ * A touch-friendly DOM block editor for `blocknir/blocks`: a palette from
  * `palette(level)`, a workspace with the main stack, "Definir para…" procedures and event handlers,
  * drag and tap editing, keyboard support, undo, live block count and run highlighting.
  * Pure DOM and CSS (injected once, classes prefixed `rbk-`), no framework, no external assets.
  *
  * ```ts
- * import { BlockEditor } from 'ragnagrok-engine/blocks-ui';
+ * import { BlockEditor } from 'blocknir/blocks-ui';
  * const editor = new BlockEditor(el, { level, onChange: (program) => save(program) });
  * editor.highlight(step.node); editor.markError(err.nodeId, err.message);
  * ```

@@ -1,6 +1,8 @@
-# Ragnagrok Engine
+# Blocknir
 
 *[Leer en español](README.es.md)*
+
+*Blocknir — the hammer that forges block worlds.*
 
 A small voxel engine for the web, written in TypeScript on top of [three.js](https://threejs.org).
 It comes with a browser editor and a synthesized audio engine, so a game can be made of models,
@@ -8,6 +10,10 @@ scenes and sound without image or audio files.
 
 It was extracted from two games by [Ragnagrok](https://github.com/Ragnagrok): **Nullgard**, a
 top-down adventure about learning to program, and a fixed-camera voxel survival-horror prototype.
+
+The name follows the legendary objects of Norse myth, whose names end in *-nir* and say what they
+do: Mjölnir, Thor's hammer; Gungnir, Odin's spear; Draupnir, his ring. Blocknir is the one that
+forges blocks.
 
 - **Voxel models** with a compact run-length format, chunked meshing with per-vertex ambient
   occlusion, emissive colors that glow, and cheap instancing of repeated props.
@@ -30,8 +36,8 @@ Online, without installing anything: **<https://engine.ragnagrok.com>** (the edi
 Or locally:
 
 ```sh
-git clone https://github.com/Ragnagrok/ragnagrok-engine.git
-cd ragnagrok-engine
+git clone https://github.com/Ragnagrok/blocknir.git
+cd blocknir
 npm install
 npm run dev
 ```
@@ -56,12 +62,12 @@ PROJECT=path/to/project.json npm run dev
 The engine is not on npm yet. Install it from GitHub; `three` is a peer dependency:
 
 ```sh
-npm install three github:Ragnagrok/ragnagrok-engine
+npm install three github:Ragnagrok/blocknir
 ```
 
 ```ts
-import { createGrid, newModel, setCell, setGrid } from 'ragnagrok-engine/core';
-import { placeModel, View } from 'ragnagrok-engine/render';
+import { createGrid, newModel, setCell, setGrid } from 'blocknir/core';
+import { placeModel, View } from 'blocknir/render';
 
 const crate = newModel('crate', 'Crate', [8, 8, 8], 0.125, false, [0x8a5a34, 0x5a3a20]);
 const grid = createGrid(8, 8, 8);
@@ -81,7 +87,7 @@ view.renderer.setAnimationLoop((ms) => view.render(ms / 1000));
 Sound needs no files either:
 
 ```ts
-import { DEMO_TRACK, GameAudio } from 'ragnagrok-engine/audio';
+import { DEMO_TRACK, GameAudio } from 'blocknir/audio';
 
 const audio = new GameAudio({ storageKey: 'my-game.audio' });
 audio.start(); // it begins sounding after the first tap or key press
@@ -93,14 +99,14 @@ audio.play((sfx) => sfx.step('stone'));
 
 | Import | What's in it |
 |---|---|
-| `ragnagrok-engine/core` | The project format (`Project`, `Model`, `Scene`, `Figure`…), voxel grids and raycasting, keyframe poses, the walkable heightmap and pathfinding, validation, and `migrateLegacyProject` for projects saved by the original Spanish-language editor. No DOM, no three.js. |
-| `ragnagrok-engine/render` | Meshing (`meshVoxels`, `VoxelMesh`), `buildScene`, `Figure3D`, and `View`: renderer, shadows, bloom and a light film finish. |
-| `ragnagrok-engine/audio` | `AudioEngine`, `INSTRUMENTS`, the `Playback` sequencer and music theory helpers, `Sfx`, `Ambience`, and the `GameAudio` facade. |
-| `ragnagrok-engine/kit` | `Joystick`, `Dialogue`, `Director`, `Actor`, `SaveSlot`. |
-| `ragnagrok-engine/paint` | `VoxelCanvas` and noise helpers for procedural models, and `createHumanoid`, a parametric voxel character (skin, hair, clothes, glasses, beard, silhouette) rigged with idle, walk, inspect and talk clips. |
-| `ragnagrok-engine/blocks` | A block-based programming language for kids and its interpreter, with the worlds programs run in: a grid with a robot (items, lamps, arrows, walls, level-defined actions), a drawing turtle, and a tick-based realtime arena with scripted actors. Levels, goals and execution traces are plain JSON; `check(level, program)` tests a program on every board and says why it fails, in Spanish by default. No DOM, no three.js. See [`src/blocks/README.md`](src/blocks/README.md). |
-| `ragnagrok-engine/blocks-ui` | `BlockEditor`: a touch-friendly block editor for that language (drag, tap or keyboard), with live block count against the level's limit, highlighting of the running block, error bubbles, undo and light/dark themes. Pure DOM, no framework. |
-| `ragnagrok-engine/blocks-3d` | `BoardView`: renders and animates grid, turtle and realtime worlds in voxels from an execution trace, with skins to give each game its own characters, items and floors. Ships a default skin. |
+| `blocknir/core` | The project format (`Project`, `Model`, `Scene`, `Figure`…), voxel grids and raycasting, keyframe poses, the walkable heightmap and pathfinding, validation, and `migrateLegacyProject` for projects saved by the original Spanish-language editor. No DOM, no three.js. |
+| `blocknir/render` | Meshing (`meshVoxels`, `VoxelMesh`), `buildScene`, `Figure3D`, and `View`: renderer, shadows, bloom and a light film finish. |
+| `blocknir/audio` | `AudioEngine`, `INSTRUMENTS`, the `Playback` sequencer and music theory helpers, `Sfx`, `Ambience`, and the `GameAudio` facade. |
+| `blocknir/kit` | `Joystick`, `Dialogue`, `Director`, `Actor`, `SaveSlot`. |
+| `blocknir/paint` | `VoxelCanvas` and noise helpers for procedural models, and `createHumanoid`, a parametric voxel character (skin, hair, clothes, glasses, beard, silhouette) rigged with idle, walk, inspect and talk clips. |
+| `blocknir/blocks` | A block-based programming language for kids and its interpreter, with the worlds programs run in: a grid with a robot (items, lamps, arrows, walls, level-defined actions), a drawing turtle, and a tick-based realtime arena with scripted actors. Levels, goals and execution traces are plain JSON; `check(level, program)` tests a program on every board and says why it fails, in Spanish by default. No DOM, no three.js. See [`src/blocks/README.md`](src/blocks/README.md). |
+| `blocknir/blocks-ui` | `BlockEditor`: a touch-friendly block editor for that language (drag, tap or keyboard), with live block count against the level's limit, highlighting of the running block, error bubbles, undo and light/dark themes. Pure DOM, no framework. |
+| `blocknir/blocks-3d` | `BoardView`: renders and animates grid, turtle and realtime worlds in voxels from an execution trace, with skins to give each game its own characters, items and floors. Ships a default skin. |
 
 Positions are in meters, model sizes in voxels, angles in radians. A heading of 0 faces +z.
 [`GLOSSARY.md`](GLOSSARY.md) maps the engine's names to the Spanish ones it had inside the games.

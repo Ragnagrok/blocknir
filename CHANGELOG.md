@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+Ragnagrok Engine is now **Blocknir**.
+
+- The package is `blocknir` and the repository `Ragnagrok/blocknir`. Imports change from
+  `ragnagrok-engine/<module>` to `blocknir/<module>`; the modules and their APIs are the same.
+- The site moves to blocknir.ragnagrok.com.
+- Projects saved in the browser by earlier versions still load: the editor keeps its storage names.
+
 ## 0.3.8
 
 Variable monitors, three ways to join blocks, and a palette in three kinds.
