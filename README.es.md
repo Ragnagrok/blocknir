@@ -35,7 +35,7 @@ el que forja bloques.
 
 ## Probarlo
 
-Online, sin instalar nada: **<https://engine.ragnagrok.com>** (el editor y los ejemplos).
+Online, sin instalar nada: **<https://blocknir.ragnagrok.com>** (el editor y los ejemplos).
 
 O en tu máquina:
 

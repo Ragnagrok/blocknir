@@ -31,7 +31,7 @@ forges blocks.
 
 ## Try it
 
-Online, without installing anything: **<https://engine.ragnagrok.com>** (the editor and the examples).
+Online, without installing anything: **<https://blocknir.ragnagrok.com>** (the editor and the examples).
 
 Or locally:
 
