@@ -1,6 +1,6 @@
 {
   "name": "blocknir",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Voxel engine for the web: chunked voxel meshing with ambient occlusion, rigged voxel figures, fixed cameras, collision and pathfinding, a synthesized audio engine and a browser editor.",
   "license": "MIT",
   "type": "module",

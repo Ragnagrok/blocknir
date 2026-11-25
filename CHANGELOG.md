@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- The README links to the site at blocknir.ragnagrok.com (engine.ragnagrok.com no longer exists).
+
 ## 0.4.0
 
 Ragnagrok Engine is now **Blocknir**.
